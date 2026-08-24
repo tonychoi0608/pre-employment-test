@@ -307,6 +307,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:20px 0}
 var COMPANY='고강이엔지';
 var DEFAULT_PASS='1379';
 var VERSION='1.0';
+/* 결과 자동 전송: Apps Script 웹 앱 URL을 넣으면 켜지고, 비워 두면 완전히 꺼집니다. */
+var SEND_URL='';
+var SEND_TOKEN='gk-1379';
 
 /* ================= 문항 데이터 ================= */
 /* tr: CH도전 GR끈기 PS문제해결 TW조직융화 CS성실안전 ES정서안정 SD바람직성 CO일관성쌍 / r: 역채점 */
@@ -661,6 +664,7 @@ function renderInfo(){
       '<span class="note" id="pdfStat1"></span></div>'+
       '<textarea id="fResume" placeholder="PDF를 첨부하면 내용이 자동으로 이 칸에 들어옵니다. 직접 붙여넣어도 되고, 면접 담당자가 나중에 넣어도 됩니다.">'+esc(S.resume)+'</textarea>'+
       '<input type="file" id="filePdf1" accept=".pdf,.txt,application/pdf" style="display:none"></div>'+
+    (SEND_URL?'<p class="note" style="margin-top:4px">입력한 정보와 검사 결과는 채용 평가 목적으로만 사용되며, 고강이엔지 채용 담당자에게 전송·보관됩니다. 검사를 진행하면 이에 동의한 것으로 봅니다.</p>':'')+
     '<div class="warn-inline" id="infoWarn" style="display:none">이름, 지원 직무, 경력을 모두 입력해 주세요.</div>'+
     '<div class="navrow"><button class="btn ghost" id="btnBack">← 처음으로</button>'+
     '<button class="btn primary" id="btnNext">다음 →</button></div>'+
@@ -953,10 +957,12 @@ function renderDone(){
   '<div class="wrap"><div class="card center" style="padding:48px 30px">'+
     '<div class="bigicon">✓</div>'+
     '<h1 style="font-size:24px">검사가 끝났습니다</h1>'+
-    '<p class="sub">'+esc(S.info.name)+'님, 수고하셨습니다.<br>면접 담당자에게 완료되었다고 알려 주세요.</p>'+
+    '<p class="sub">'+esc(S.info.name)+'님, 수고하셨습니다.<br>'+(SEND_URL&&!S.demo?'검사 결과는 회사 채용 담당자에게 자동 전송됩니다.':'면접 담당자에게 완료되었다고 알려 주세요.')+'</p>'+
+    (SEND_URL&&!S.demo?'<div class="mt16" id="sendStat"></div>':'')+
     '<div class="mt24 no-print"><button class="btn small ghost" id="btnReport">면접 담당자용 · 결과 보기</button></div>'+
   '</div></div>';
   $('btnReport').onclick=function(){go('gate')};
+  if(SEND_URL&&!S.demo){if(S.sendOk)setSendStat('ok');else sendResults();}
 }
 
 /* ================= 게이트 ================= */
@@ -1207,7 +1213,8 @@ function buildExportData(){
     var t2=(S.essay[i]||'').trim();
     return {번호:i+1,관련역량:q.tr,질문:q.q,답변:t2||'(무응답)',글자수:t2.length};
   });
-  var partSec={};for(var k in S.partT)partSec[k]=Math.round(S.partT[k]/1000);
+  var srcPT=(S.result&&S.result.partT)?S.result.partT:S.partT; /* 보관 결과 불러온 경우 그 응시자의 파트별 시간 사용 */
+  var partSec={};for(var k in srcPT)partSec[k]=Math.round(srcPT[k]/1000);
   return {
     검사정보:{회사:COMPANY,검사명:'입사 전 인적성검사',버전:VERSION,응시일시:new Date(r.ts).toLocaleString('ko-KR'),
       총소요:fmtSec(r.durMs),파트별소요초:partSec,데모여부:S.demo},
@@ -1251,6 +1258,47 @@ function buildPackage(){
   return AI_PROMPT+'\n\n===== 검사 데이터 (JSON) =====\n'+JSON.stringify(data,null,1)+
     '\n\n===== 이력서 =====\n'+(S.resume?S.resume:'제출되지 않음 — 이력서 파일이 별도로 있으면 이 대화에 함께 첨부해 주세요.');
 }
+/* ================= 결과 자동 전송 ================= */
+function setSendStat(st){
+  var el=$('sendStat');if(!el)return;
+  if(st==='sending')el.innerHTML='<span class="note">⏳ 결과를 회사로 전송하고 있습니다… 잠시만 기다려 주세요.</span>';
+  else if(st==='ok')el.innerHTML='<span style="color:#2E7D46;font-weight:600">✅ 결과가 회사로 안전하게 전송되었습니다.</span><div class="note" style="margin-top:6px">이제 창을 닫으셔도 됩니다.</div>';
+  else{
+    el.innerHTML='<span style="color:#B3402A;font-weight:600">⚠️ 자동 전송에 실패했습니다.</span>'+
+      '<div class="mt16"><button class="btn small" id="btnResend">다시 전송</button></div>'+
+      '<div class="note" style="margin-top:6px">인터넷 연결을 확인한 뒤 다시 눌러 주세요.<br>계속 실패하면 면접 담당자에게 알려 주세요.</div>';
+    var b=$('btnResend');if(b)b.onclick=sendResults;
+  }
+}
+function buildSendSummary(){
+  var r=S.result,m=r.motive||{};
+  return {
+    self:'도전 '+r.self.CH+' · 끈기 '+r.self.GR+' · 문제해결 '+r.self.PS+' · 조직융화 '+r.self.TW+' · 성실안전 '+r.self.CS+' · 정서안정 '+r.self.ES,
+    sjt:r.sjtAvg,
+    mech:r.mechOK+'/'+MECH.length,
+    drive:m.pairPct?('지배 '+m.pairPct.D+'% · 자극 '+m.pairPct.S+'% · 균형 '+m.pairPct.B+'%'):'',
+    gap:m.gap?'있음':'없음'
+  };
+}
+function sendResults(){
+  if(!SEND_URL||S.demo||!S.result||S.sendBusy)return;
+  if(!window.fetch){setSendStat('fail');return}
+  S.sendBusy=true;
+  setSendStat('sending');
+  var r=S.result;
+  var payload={token:SEND_TOKEN,name:S.info.name,role:S.info.role,career:S.info.career,
+    ts:r.ts,dur:fmtSec(r.durMs),grade:r.rel.grade,summary:buildSendSummary(),package:buildPackage()};
+  var ctl=window.AbortController?new AbortController():null;
+  var tmr=ctl?setTimeout(function(){ctl.abort()},45000):null;
+  fetch(SEND_URL,{method:'POST',body:JSON.stringify(payload),signal:ctl?ctl.signal:undefined})
+    .then(function(res){if(!res.ok)throw new Error('http '+res.status);return res.json()})
+    .then(function(j){
+      if(tmr)clearTimeout(tmr);S.sendBusy=false;
+      if(j&&j.ok){S.sendOk=true;setSendStat('ok')}else setSendStat('fail');
+    })
+    .catch(function(){if(tmr)clearTimeout(tmr);S.sendBusy=false;setSendStat('fail')});
+}
+
 function copyText(txt,okMsg){
   function fallback(){
     var ta=$('pkgArea');
