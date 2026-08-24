@@ -315,7 +315,7 @@ var COMPANY='고강이엔지';
 var DEFAULT_PASS='1379';
 var VERSION='1.0';
 /* 결과 자동 전송: Apps Script 웹 앱 URL을 넣으면 켜지고, 비워 두면 완전히 꺼집니다. */
-var SEND_URL='';
+var SEND_URL='https://script.google.com/macros/s/AKfycbwPvmU5m4dmeCGabLEt_vYUXb0yRLp2WGq2Z5Rcw017cwr2dczf4C-QvbikMD-VCnng-A/exec';
 var SEND_TOKEN='gk-1379';
 
 /* ================= 문항 데이터 ================= */
@@ -635,7 +635,7 @@ function renderStart(){
       '</div>'+
       '<div class="mt24"><button class="btn accent" id="btnStart" style="min-width:220px">검사 시작하기</button></div>'+
       (hasDraft?'<div class="mt16"><button class="linkish" id="btnResume">진행 중이던 검사 이어하기 ('+esc(draft.info.name)+')</button></div>':'')+
-      '<div class="mt24 note">응답 내용은 이 컴퓨터(브라우저)에만 저장됩니다.</div>'+
+      '<div class="mt24 note">'+(SEND_URL?'응답 내용은 채용 평가 목적으로만 사용되며, 검사 완료 시 고강이엔지 채용 담당자에게 전송됩니다.':'응답 내용은 이 컴퓨터(브라우저)에만 저장됩니다.')+'</div>'+
     '</div>'+
     '<div class="center no-print"><button class="linkish" id="btnAdmin">관리자 · 결과 보기 / 데모 미리보기</button></div>'+
   '</div>';
@@ -1608,5 +1608,6 @@ function renderReport(){
 go('start');
 })();
 </script>
+
 </body>
 </html>
