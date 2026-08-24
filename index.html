@@ -1294,7 +1294,8 @@ function sendResults(){
   setSendStat('sending');
   var r=S.result;
   var payload={token:SEND_TOKEN,name:S.info.name,role:S.info.role,career:S.info.career,
-    ts:r.ts,dur:fmtSec(r.durMs),grade:r.rel.grade,summary:buildSendSummary(),package:buildPackage()};
+    ts:r.ts,dur:fmtSec(r.durMs),grade:r.rel.grade,summary:buildSendSummary(),
+    data:buildExportData(),package:buildPackage()};
   var ctl=window.AbortController?new AbortController():null;
   var tmr=ctl?setTimeout(function(){ctl.abort()},45000):null;
   fetch(SEND_URL,{method:'POST',body:JSON.stringify(payload),signal:ctl?ctl.signal:undefined})
