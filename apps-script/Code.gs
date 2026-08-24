@@ -2,26 +2,56 @@
  * 고강이엔지 인적성검사 — 결과 수신 서버 (Google Apps Script)
  *
  * 하는 일:
- *  1) 검사 페이지가 보낸 결과를 받아 구글 스프레드시트에 한 줄씩 기록
+ *  1) 검사 페이지가 보낸 결과를 구글 스프레드시트에 한 줄씩 기록 (요약 + 원본 데이터 전체)
  *  2) 메일에서 바로 읽을 수 있는 결과지(HTML)를 만들어 발송
- *  3) AI 분석용 전체 데이터는 txt 파일로 첨부
+ *  3) 관리자가 검사 페이지에서 담당자 코드를 입력하면, 이 시트에 쌓인 결과를
+ *     어떤 기기(폰 포함)에서든 목록/상세로 조회할 수 있게 하는 조회 API(doGet)
  *
  * 설치 방법은 같은 폴더의 설정방법.md 참고.
+ * ⚠ 이 파일을 고치면 반드시 "배포 → 배포 관리 → 편집 → 새 버전"으로 다시 배포해야 반영됩니다.
  */
 
 var TO_EMAIL = 'gokang.korea@gmail.com';        // 결과를 받을 메일 주소
 var TOKEN = 'gk-1379';                           // 검사 페이지와 맞춰 둔 확인용 코드
 var SHEET_NAME = '고강이엔지 인적성검사 결과';   // 자동 생성될 스프레드시트 이름
+var MAX_CELL = 45000;                            // 시트 한 셀에 담는 텍스트의 안전 길이 한도
 
 /* 색상 */
 var C_INK = '#1B2430', C_MUTED = '#62707E', C_LINE = '#DCE1E5';
 var C_BG = '#F3F4F2', C_TRACK = '#E6E9E7', C_STEEL = '#2E4057';
 var C_GOOD = '#2E7D46', C_MID = '#2E4057', C_WARN = '#B07A22', C_BAD = '#B3402A';
 
-function doGet() {
-  return ContentService.createTextOutput('ok');
+/* 시트 컬럼 순서. 예전 시트에 없던 컬럼(뒤 3개)은 열 때 자동으로 추가됩니다. */
+var HEADERS = ['접수일시', '이름', '지원직무', '경력', '소요시간', '신뢰도',
+  '자기보고(100점)', '상황판단 평균', '실무감각', '타고난 동기', '동기 괴리', '메일',
+  '접수ID', '원본데이터', '패키지'];
+
+/* ================= 진입점 ================= */
+
+/** 관리자 조회용. ?action=list 또는 ?action=get&id=... + token 필요. 없으면 헬스체크. */
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  var cb = p.callback;
+  function respond(obj) {
+    var body = JSON.stringify(obj);
+    if (cb) {
+      return ContentService.createTextOutput(cb + '(' + body + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return json_(obj);
+  }
+  if (!p.action) return respond({ ok: true });
+  if (p.token !== TOKEN) return respond({ ok: false, err: 'unauthorized' });
+  try {
+    if (p.action === 'list') return respond({ ok: true, items: listResults_() });
+    if (p.action === 'get') return respond({ ok: true, item: getResult_(p.id) });
+    return respond({ ok: false, err: 'unknown action' });
+  } catch (err) {
+    return respond({ ok: false, err: String(err) });
+  }
 }
 
+/** 검사 완료 시 결과 수신. */
 function doPost(e) {
   var out = { ok: false };
   try {
@@ -57,6 +87,10 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o))
     .setMimeType(ContentService.MimeType.JSON);
 }
+function trim_(t) {
+  t = String(t == null ? '' : t);
+  return t.length > MAX_CELL ? t.slice(0, MAX_CELL) + '\n…(길이 제한으로 생략됨 — 전체 내용은 메일 첨부 파일 참고)' : t;
+}
 
 /* ================= 스프레드시트 ================= */
 function getSheet_() {
@@ -72,14 +106,26 @@ function getSheet_() {
     if (!ss) {
       ss = SpreadsheetApp.create(SHEET_NAME);
       props.setProperty('sheetId', ss.getId());
-      ss.getSheets()[0].appendRow(['접수일시', '이름', '지원직무', '경력', '소요시간', '신뢰도',
-        '자기보고(100점)', '상황판단 평균', '실무감각', '타고난 동기', '동기 괴리', '메일']);
+      ss.getSheets()[0].appendRow(HEADERS);
       ss.getSheets()[0].setFrozenRows(1);
+    } else {
+      migrateHeaders_(ss.getSheets()[0]);
     }
     return ss;
   } finally {
     lock.releaseLock();
   }
+}
+
+/** 예전에 만들어진 시트에 새 컬럼(접수ID/원본데이터/패키지)이 없으면 헤더를 맞춰 확장합니다. */
+function migrateHeaders_(sheet) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var cur = sheet.getRange(1, 1, 1, Math.max(lastCol, HEADERS.length)).getValues()[0];
+  var need = false;
+  for (var i = 0; i < HEADERS.length; i++) {
+    if (cur[i] !== HEADERS[i]) { need = true; break; }
+  }
+  if (need) sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
 }
 
 function appendRow_(d, s, when, mailStat) {
@@ -88,8 +134,61 @@ function appendRow_(d, s, when, mailStat) {
     Utilities.formatDate(when, 'Asia/Seoul', 'yyyy-MM-dd HH:mm'),
     d.name || '', d.role || '', d.career || '', d.dur || '', d.grade || '',
     s.self || '', s.sjt != null ? s.sjt : '', s.mech || '', s.drive || '', s.gap || '',
-    mailStat
+    mailStat,
+    d.ts != null ? String(d.ts) : '',
+    d.data ? trim_(JSON.stringify(d.data)) : '',
+    d.package ? trim_(d.package) : ''
   ]);
+}
+
+/* ================= 관리자 조회 API ================= */
+function sheetRows_() {
+  var sheet = getSheet_().getSheets()[0];
+  var last = sheet.getLastRow();
+  if (last < 2) return [];
+  return sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
+}
+function colIdx_(name) { return HEADERS.indexOf(name); }
+
+/** 목록 조회용 — 가벼운 요약만 반환(원본데이터·패키지는 제외), 최신순. */
+function listResults_() {
+  var rows = sheetRows_();
+  var iId = colIdx_('접수ID'), iWhen = colIdx_('접수일시'), iName = colIdx_('이름'),
+    iRole = colIdx_('지원직무'), iCareer = colIdx_('경력'), iDur = colIdx_('소요시간'),
+    iGrade = colIdx_('신뢰도'), iSelf = colIdx_('자기보고(100점)'), iSjt = colIdx_('상황판단 평균'),
+    iMech = colIdx_('실무감각'), iDrive = colIdx_('타고난 동기'), iGap = colIdx_('동기 괴리'),
+    iData = colIdx_('원본데이터');
+  var items = [];
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r];
+    if (!row[iName]) continue;
+    items.push({
+      id: row[iId] ? String(row[iId]) : ('row' + r),
+      when: row[iWhen], name: row[iName], role: row[iRole], career: row[iCareer],
+      dur: row[iDur], grade: row[iGrade], self: row[iSelf], sjt: row[iSjt],
+      mech: row[iMech], drive: row[iDrive], gap: row[iGap],
+      hasDetail: !!row[iData]
+    });
+  }
+  items.reverse();
+  return items;
+}
+
+/** 상세 조회용 — 접수ID로 해당 행의 원본데이터(JSON)와 패키지(AI 분석용 전체 텍스트)를 반환. */
+function getResult_(id) {
+  if (!id) throw new Error('id가 필요합니다');
+  var rows = sheetRows_();
+  var iId = colIdx_('접수ID'), iData = colIdx_('원본데이터'), iPkg = colIdx_('패키지'),
+    iName = colIdx_('이름'), iWhen = colIdx_('접수일시');
+  for (var r = rows.length - 1; r >= 0; r--) {
+    var row = rows[r];
+    var rowId = row[iId] ? String(row[iId]) : ('row' + r);
+    if (rowId === String(id)) {
+      if (!row[iData]) throw new Error('상세 데이터가 없습니다 (이 기능 도입 전에 접수된 과거 결과입니다 — 검사 PC에서 "클라우드로 전송" 버튼을 한 번 눌러 다시 보내 주세요)');
+      return { data: JSON.parse(row[iData]), package: row[iPkg] || '', name: row[iName], when: row[iWhen] };
+    }
+  }
+  throw new Error('해당 접수 건을 찾을 수 없습니다');
 }
 
 /* ================= 메일 ================= */

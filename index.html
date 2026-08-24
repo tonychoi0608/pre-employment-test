@@ -836,7 +836,8 @@ function go(screen){
     p4:function(){renderPartIntro(4)},mech:renderMech,
     p5:function(){renderPartIntro(5)},motive:renderMotive,limbic:renderLimbic,
     p6:function(){renderPartIntro(6)},essay:renderEssay,
-    done:renderDone,gate:renderGate,report:renderReport};
+    done:renderDone,gate:renderGate,report:renderReport,
+    cloudlist:renderCloudList};
   (r[screen]||renderStart)();
   window.scrollTo(0,0);
   setProgress();
@@ -1226,6 +1227,7 @@ function renderGate(){
     if($('fPass').value===getPass()){
       if(afterDemo){makeDemo();}
       if(S.result)go('report');
+      else if(SEND_URL)go('cloudlist');
       else{loadLatestArchiveOrWarn();}
     }else{$('gateWarn').style.display='block'}
   }
@@ -1508,15 +1510,15 @@ function buildPackage(){
     '\n\n===== 이력서 =====\n'+(S.resume?S.resume:'제출되지 않음 — 이력서 파일이 별도로 있으면 이 대화에 함께 첨부해 주세요.');
 }
 /* ================= 결과 자동 전송 ================= */
-function setSendStat(st){
-  var el=$('sendStat');if(!el)return;
+function setSendStat(st,elId){
+  var el=$(elId||'sendStat');if(!el)return;
   if(st==='sending')el.innerHTML='<span class="note">⏳ 결과를 회사로 전송하고 있습니다… 잠시만 기다려 주세요.</span>';
-  else if(st==='ok')el.innerHTML='<span style="color:#2E7D46;font-weight:600">✅ 결과가 회사로 안전하게 전송되었습니다.</span><div class="note" style="margin-top:6px">이제 창을 닫으셔도 됩니다.</div>';
+  else if(st==='ok')el.innerHTML='<span style="color:#2E7D46;font-weight:600">✅ 결과가 회사로 안전하게 전송되었습니다.</span>';
   else{
-    el.innerHTML='<span style="color:#B3402A;font-weight:600">⚠️ 자동 전송에 실패했습니다.</span>'+
-      '<div class="mt16"><button class="btn small" id="btnResend">다시 전송</button></div>'+
-      '<div class="note" style="margin-top:6px">인터넷 연결을 확인한 뒤 다시 눌러 주세요.<br>계속 실패하면 면접 담당자에게 알려 주세요.</div>';
-    var b=$('btnResend');if(b)b.onclick=sendResults;
+    el.innerHTML='<span style="color:#B3402A;font-weight:600">⚠️ 전송에 실패했습니다.</span>'+
+      '<div class="mt16"><button class="btn small" id="btnResend'+(elId||'')+'">다시 전송</button></div>'+
+      '<div class="note" style="margin-top:6px">인터넷 연결을 확인한 뒤 다시 눌러 주세요.</div>';
+    var b=$('btnResend'+(elId||''));if(b)b.onclick=function(){sendResults(elId)};
   }
 }
 function buildSendSummary(){
@@ -1529,11 +1531,11 @@ function buildSendSummary(){
     gap:m.gap?'있음':'없음'
   };
 }
-function sendResults(){
+function sendResults(elId){
   if(!SEND_URL||S.demo||!S.result||S.sendBusy)return;
-  if(!window.fetch){setSendStat('fail');return}
+  if(!window.fetch){setSendStat('fail',elId);return}
   S.sendBusy=true;
-  setSendStat('sending');
+  setSendStat('sending',elId);
   var r=S.result;
   var payload={token:SEND_TOKEN,name:S.info.name,role:S.info.role,career:S.info.career,
     ts:r.ts,dur:fmtSec(r.durMs),grade:r.rel.grade,summary:buildSendSummary(),
@@ -1544,9 +1546,184 @@ function sendResults(){
     .then(function(res){if(!res.ok)throw new Error('http '+res.status);return res.json()})
     .then(function(j){
       if(tmr)clearTimeout(tmr);S.sendBusy=false;
-      if(j&&j.ok){S.sendOk=true;setSendStat('ok')}else setSendStat('fail');
+      if(j&&j.ok){S.sendOk=true;setSendStat('ok',elId)}else setSendStat('fail',elId);
     })
-    .catch(function(){if(tmr)clearTimeout(tmr);S.sendBusy=false;setSendStat('fail')});
+    .catch(function(){if(tmr)clearTimeout(tmr);S.sendBusy=false;setSendStat('fail',elId)});
+}
+
+/* ================= 클라우드 조회 (관리자 · 어디서든) ================= */
+function cloudCall(params,onOk,onErr){
+  if(!SEND_URL){onErr&&onErr('전송 주소가 설정되어 있지 않습니다');return}
+  var cbName='gkcb_'+now()+'_'+Math.floor(Math.random()*1e6);
+  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k])}).join('&');
+  var s=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){if(!done){done=true;cleanup();onErr&&onErr('응답이 없습니다(시간 초과) — 인터넷 연결을 확인해 주세요')}},15000);
+  function cleanup(){clearTimeout(timer);try{delete window[cbName]}catch(e){window[cbName]=undefined}if(s.parentNode)s.parentNode.removeChild(s)}
+  window[cbName]=function(json){
+    if(done)return;done=true;cleanup();
+    if(json&&json.ok)onOk&&onOk(json);
+    else onErr&&onErr((json&&json.err)||'알 수 없는 오류');
+  };
+  s.onerror=function(){if(done)return;done=true;cleanup();onErr&&onErr('네트워크 오류 — 인터넷 연결을 확인해 주세요')};
+  s.src=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+qs+'&callback='+cbName;
+  document.body.appendChild(s);
+}
+function fmtCloudWhen(w){
+  if(!w)return '-';
+  var d=new Date(w);
+  if(isNaN(d.getTime()))return String(w);
+  return d.toLocaleString('ko-KR');
+}
+function renderCloudList(){
+  setTop('전체 지원자 · 클라우드');$('topTimer').textContent='';
+  $('main').innerHTML=
+  '<div class="wrap wide"><div class="row spread" style="margin-bottom:14px">'+
+    '<h1 style="font-size:22px">전체 지원자 목록</h1>'+
+    '<button class="btn small ghost" id="btnBack2">돌아가기</button>'+
+  '</div><div class="card" id="cloudBox"><div class="note">불러오는 중…</div></div></div>';
+  $('btnBack2').onclick=function(){go(S.finishedAt?'done':'start')};
+  loadCloudList();
+}
+function loadCloudList(){
+  var box=$('cloudBox');if(!box)return;
+  box.innerHTML='<div class="note">불러오는 중…</div>';
+  cloudCall({action:'list',token:SEND_TOKEN},function(res){
+    var items=res.items||[];
+    if(!items.length){box.innerHTML='<div class="note">아직 접수된 결과가 없습니다.</div>';return}
+    var rows=items.map(function(it,idx){
+      var g=it.grade||'';
+      var badge=g==='양호'?'good':(g==='주의'?'warn':(g?'bad':'neutral'));
+      return '<tr class="cloudRow" data-idx="'+idx+'" style="cursor:pointer">'+
+        '<td><b>'+esc(it.name||'-')+'</b></td>'+
+        '<td>'+esc(it.role||'-')+' · '+esc(it.career||'-')+'</td>'+
+        '<td class="note">'+esc(fmtCloudWhen(it.when))+'</td>'+
+        '<td><span class="badge '+badge+'">'+esc(g||'-')+'</span></td>'+
+        '<td class="note" style="text-align:right">'+(it.hasDetail?'상세 보기 →':'요약만(과거 접수)')+'</td>'+
+      '</tr>';
+    }).join('');
+    box.innerHTML='<div class="note" style="margin-bottom:10px">총 '+items.length+'건 · 최신순</div>'+
+      '<div style="overflow-x:auto"><table class="mini-table"><tr><th>이름</th><th>직무·경력</th><th>응시일시</th><th>신뢰도</th><th></th></tr>'+rows+'</table></div>';
+    var trs=box.querySelectorAll('.cloudRow');
+    for(var i=0;i<trs.length;i++){
+      trs[i].onclick=(function(it){return function(){openCloudItem(it)}})(items[parseInt(trs[i].getAttribute('data-idx'),10)]);
+    }
+  },function(err){
+    box.innerHTML='<div class="warn-inline" style="display:block">목록을 불러오지 못했습니다: '+esc(err)+'</div>'+
+      '<button class="btn small mt16" id="btnRetryCloud">다시 시도</button>';
+    var b=$('btnRetryCloud');if(b)b.onclick=loadCloudList;
+  });
+}
+function openCloudItem(it){
+  var box=$('cloudBox');if(!box)return;
+  box.innerHTML='<div class="note">'+esc(it.name)+'님 상세 결과를 불러오는 중…</div>';
+  cloudCall({action:'get',token:SEND_TOKEN,id:it.id},function(res){
+    renderCloudReport(res.item);
+  },function(err){
+    box.innerHTML='<div class="warn-inline" style="display:block">불러오지 못했습니다: '+esc(err)+'</div>'+
+      '<button class="btn small mt16" id="btnBackList">목록으로</button>';
+    var b=$('btnBackList');if(b)b.onclick=renderCloudList;
+  });
+}
+function cloudRadar(combined){
+  var order=[['도전정신','도전'],['끈기','끈기'],['문제해결력','문제해결'],['조직융화','조직융화'],['성실·안전','성실·안전']];
+  return radarSVG(order.map(function(x){return {name:x[1],v:combined[x[0]]||0}}));
+}
+function cloudMotiveHTML(mp,rankArr){
+  mp=mp||{};
+  var limb=mp.타고난동기_림빅양자택일,wish=mp.직장에바라는조건_우선순위기반||mp.우선순위기반;
+  var html='';
+  if(limb&&limb.강도100){
+    var p=limb.강도100;
+    html+='<div class="note" style="margin-bottom:10px"><b>타고난 동기</b> (양자택일 12문항)</div><div class="score-list">'+
+      [['성취·인정 (지배욕)',p.지배욕],['새로움·배움 (자극욕)',p.자극욕],['안정·소속 (균형욕)',p.균형욕]].map(function(x){
+        return '<div class="score-item"><div class="row1"><span class="name">'+x[0]+'</span><span class="val">'+(x[1]||0)+'점</span></div><div class="bar orange"><i style="width:'+(x[1]||0)+'%"></i></div></div>';
+      }).join('')+'</div>';
+  }
+  if(mp.타고난동기와_직장조건의_괴리&&mp.타고난동기와_직장조건의_괴리.indexOf('있음')===0){
+    html+='<div class="chips mt16"><span class="badge warn">타고난 동기와 직장에 바라는 조건이 다름 — 면접 확인 포인트</span></div>';
+  }
+  html+='<div class="note mt16"><b>직장에 바라는 조건</b>: '+esc((rankArr||[]).join(' · ')||'무응답')+'</div>';
+  if(mp.보상선택)html+='<div class="note mt8">보상 성향: <b>'+esc(mp.보상선택)+'</b></div>';
+  return html||'<div class="note">동기 데이터가 없습니다.</div>';
+}
+function renderCloudReport(item){
+  var box=$('cloudBox');if(!box)return;
+  var x=item.data,pkg=item.package||'';
+  if(!x){box.innerHTML='<div class="warn-inline" style="display:block">데이터 형식을 읽을 수 없습니다.</div>';return}
+  var meta=x.검사정보||{},info=x.지원자정보||{},rel=x.신뢰도지표||{};
+  var sum=x.점수요약_100점||{},combined=sum.종합_자기보고60_상황판단40||{},selfS=sum.자기보고||{},sjt=sum.상황판단||{};
+  var alias={'성실·안전':'성실안전','정서 안정':'정서안정'};
+  var dualRows='';
+  [['도전정신','도전정신'],['끈기','끈기'],['문제해결력','문제해결력'],['조직융화','조직융화'],['성실·안전','성실·안전']].forEach(function(x2){
+    var sv=selfS[x2[1]]!=null?selfS[x2[1]]:selfS[alias[x2[1]]];
+    var jv=(sjt.역량별||{})[x2[1]];
+    dualRows+='<div class="dualbar"><span class="lbl">'+x2[0]+'</span><div class="bar"><i style="width:'+(sv||0)+'%"></i></div><b style="font-variant-numeric:tabular-nums">'+(sv!=null?sv:'–')+'</b></div>'+
+      '<div class="dualbar" style="margin-bottom:10px"><span class="who">상황판단</span><div class="bar orange"><i style="width:'+(jv||0)+'%"></i></div><b style="font-variant-numeric:tabular-nums">'+(jv!=null?jv:'–')+'</b></div>';
+  });
+  var mechRows=x.실무감각응답||[];
+  var mechWrong=mechRows.filter(function(m){return m.정오!=='정답'});
+  var mechTxt=String(sum.실무감각||'0/0');
+  var mechNum=parseInt(mechTxt.split('/')[0],10)||0,mechTot=parseInt(mechTxt.split('/')[1],10)||1;
+  var mechHtml=mechWrong.length
+    ?'<div class="note mt8" style="margin-bottom:4px">오답 문항만 표시합니다.</div><div style="overflow-x:auto"><table class="mini-table"><tr><th>문항</th><th>지원자 답</th><th>정답</th></tr>'+
+      mechWrong.map(function(m){return '<tr><td style="max-width:340px">'+esc(m.문항)+'</td><td class="no">'+esc(m.지원자답||'무응답')+'</td><td class="ok">'+esc(m.정답)+'</td></tr>'}).join('')+
+      '</table></div>'
+    :'<div class="note mt8">전 문항 정답입니다.</div>';
+  var essayHtml=(x.서술형응답||[]).map(function(e){
+    var empty=!e.답변||e.답변==='(무응답)';
+    return '<div class="mt16"><div class="essay-q">Q'+e.번호+'. ['+esc(e.관련역량)+'] '+esc(e.질문)+'</div>'+
+      '<div class="essay-a'+(empty?' empty':'')+'">'+esc(e.답변)+'</div></div>';
+  }).join('');
+  var flags=rel.감점요인||[];
+  var flagChips=flags.length?flags.map(function(f){return '<span class="badge warn">'+esc(f)+'</span>'}).join(''):'<span class="badge good">특이 패턴 없음</span>';
+
+  box.innerHTML=
+   '<div class="row spread no-print" style="margin-bottom:14px">'+
+     '<button class="linkish" id="btnToList">← 전체 목록</button>'+
+     '<button class="btn small" id="btnCloudPrint">인쇄</button>'+
+   '</div>'+
+   '<div class="grid2">'+
+    '<div class="card"><h2>지원자</h2><dl class="kv">'+
+      '<dt>이름</dt><dd>'+esc(info.이름)+'</dd>'+
+      '<dt>지원 직무</dt><dd>'+esc(info.지원직무)+'</dd>'+
+      '<dt>경력</dt><dd>'+esc(info.경력)+'</dd>'+
+      '<dt>응시일</dt><dd>'+esc(meta.응시일시)+'</dd>'+
+      '<dt>총 소요</dt><dd>'+esc(meta.총소요)+'</dd>'+
+    '</dl></div>'+
+    '<div class="card"><div class="row spread"><h2>응답 신뢰도</h2>'+badgeFor(rel.종합등급)+'</div>'+
+      '<div class="chips mt8">'+flagChips+'</div>'+
+      '<div class="note mt16">바람직성 '+rel.바람직성평균_5점+'/5 · 일관성 차이 최대 '+rel.일관성쌍_최대차이+' · 화면 이탈 '+rel.화면이탈횟수+'회</div>'+
+    '</div>'+
+   '</div>'+
+   '<div class="card"><h2>핵심 역량 종합 <span class="note" style="font-weight:400">(자기보고 60% + 상황판단 40%)</span></h2>'+
+    '<div class="grid2" style="align-items:center"><div class="radar-wrap">'+cloudRadar(combined)+'</div>'+
+    '<div class="score-list">'+Object.keys(combined).map(function(k){
+      var v=combined[k];
+      return '<div class="score-item"><div class="row1"><span class="name">'+esc(k)+'</span><span class="val">'+v+'점 · '+scoreWord(v)+'</span></div><div class="bar"><i style="width:'+v+'%"></i></div></div>';
+    }).join('')+'</div></div></div>'+
+   '<div class="grid2">'+
+    '<div class="card"><h2>자기보고 vs 상황판단</h2>'+dualRows+'</div>'+
+    '<div class="card"><h2>일 동기 프로필</h2>'+cloudMotiveHTML(sum.동기프로필,x.동기응답&&x.동기응답.우선순위_직장에바라는조건)+'</div>'+
+   '</div>'+
+   '<div class="card"><div class="row spread"><h2>실무 감각</h2><span class="badge '+(mechNum/mechTot>=0.8?'good':(mechNum/mechTot>=0.6?'warn':'bad'))+'">'+mechTxt+'</span></div>'+mechHtml+'</div>'+
+   '<div class="card"><h2>경험 서술 (원문)</h2>'+(essayHtml||'<div class="note">없음</div>')+'</div>'+
+   '<div class="card no-print" style="border-color:var(--accent);border-width:1.5px"><h2>AI 심층 분석</h2>'+
+    (pkg
+      ?'<p style="font-size:15px;margin-top:4px">아래 버튼으로 분석 프롬프트 + 전체 데이터를 복사한 뒤 Claude 새 대화에 붙여넣으세요.</p><div class="row mt16"><button class="btn accent" id="btnCloudCopy">분석 프롬프트 + 데이터 복사</button></div><textarea class="pkg-area mt16" id="pkgArea2" style="display:none" readonly></textarea>'
+      :'<div class="note">이 접수 건은 AI 분석용 원본 데이터가 저장되어 있지 않습니다(기능 도입 이전 접수분).</div>')+
+   '</div>';
+
+  $('btnToList').onclick=renderCloudList;
+  $('btnCloudPrint').onclick=function(){try{window.print()}catch(e){toastMsg('브라우저 인쇄 메뉴(Ctrl+P)를 이용해 주세요')}};
+  var bc=$('btnCloudCopy');
+  if(bc)bc.onclick=function(){
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(pkg).then(function(){toastMsg('복사되었습니다 — Claude 대화창에 붙여넣으세요')},function(){
+        var ta=$('pkgArea2');ta.style.display='block';ta.value=pkg;ta.focus();ta.select();
+      });
+    }else{var ta=$('pkgArea2');ta.style.display='block';ta.value=pkg;ta.focus();ta.select();try{document.execCommand('copy');toastMsg('복사되었습니다')}catch(e){}}
+  };
 }
 
 function copyText(txt,okMsg){
@@ -1752,6 +1929,7 @@ function renderReport(){
      '<h1 style="font-size:22px">면접 담당자용 결과 리포트</h1>'+
      '<div class="row">'+
        (arc.length?'<select id="selArc" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)"><option value="">저장된 결과 ('+arc.length+'건)</option>'+arcOpts+'</select>':'')+
+       (SEND_URL?'<button class="btn small ghost" id="btnCloudList">☁ 전체 지원자(클라우드)</button>':'')+
        '<button class="btn small" id="btnPrint">인쇄</button>'+
        '<button class="btn small" id="btnNew">새 검사 시작</button>'+
      '</div>'+
@@ -1814,6 +1992,13 @@ function renderReport(){
     '<textarea class="pkg-area mt16" id="pkgArea" style="display:none" readonly></textarea>'+
    '</div>'+
 
+   (SEND_URL&&!S.demo?(
+   '<div class="card no-print"><h2>클라우드 저장</h2>'+
+    '<p class="note">이 결과를 회사 클라우드(구글 시트)에 (다시) 전송합니다. 전송해 두면 다른 기기·휴대폰에서도 담당자 코드로 조회할 수 있습니다.</p>'+
+    '<div class="row mt16"><button class="btn" id="btnResendCloud">클라우드로 전송</button></div>'+
+    '<div class="mt16" id="sendStat2"></div>'+
+   '</div>'):'')+
+
    '<div class="row spread no-print" style="margin-top:6px">'+
     '<button class="linkish" id="btnDel"'+(S.demo?' style="display:none"':'')+'>이 결과 삭제</button>'+
     '<button class="linkish" id="btnPassChg">담당자 코드 변경</button>'+
@@ -1833,6 +2018,8 @@ function renderReport(){
   };
   $('btnJSON').onclick=function(){S.resume=$('fResume2').value.trim();downloadJSON()};
   wirePdf('btnPdf2','filePdf2','pdfStat2','fResume2');
+  var btnCL=$('btnCloudList');if(btnCL)btnCL.onclick=function(){go('cloudlist')};
+  var btnRC=$('btnResendCloud');if(btnRC)btnRC.onclick=function(){S.sendOk=false;sendResults('sendStat2')};
   var selArc=$('selArc');
   if(selArc)selArc.onchange=function(){if(this.value&&loadArchived(this.value))renderReport()};
   $('btnDel').onclick=function(){
