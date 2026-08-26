@@ -1569,6 +1569,19 @@ function cloudCall(params,onOk,onErr){
   s.src=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+qs+'&callback='+cbName;
   document.body.appendChild(s);
 }
+/* 같은 지원자가 여러 번 전송되어 시트에 중복 기록된 경우 한 줄로 합칩니다.
+   (이름+응시일시가 같으면 동일인 — 상세 데이터가 있는 쪽을 남깁니다) */
+function dedupeCloudItems(items){
+  var pos={},out=[];
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    var key=(it.name||'')+'|'+(it.when||'');
+    if(pos[key]===undefined){pos[key]=out.length;out.push(it);continue}
+    var cur=out[pos[key]];
+    if(it.hasDetail&&!cur.hasDetail)out[pos[key]]=it; /* 상세 있는 쪽 우선 */
+  }
+  return out;
+}
 function fmtCloudWhen(w){
   if(!w)return '-';
   var d=new Date(w);
@@ -1589,7 +1602,7 @@ function loadCloudList(){
   var box=$('cloudBox');if(!box)return;
   box.innerHTML='<div class="note">불러오는 중…</div>';
   cloudCall({action:'list',token:SEND_TOKEN},function(res){
-    var items=res.items||[];
+    var items=dedupeCloudItems(res.items||[]);
     if(!items.length){box.innerHTML='<div class="note">아직 접수된 결과가 없습니다.</div>';return}
     var rows=items.map(function(it,idx){
       var g=it.grade||'';
