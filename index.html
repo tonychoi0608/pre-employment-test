@@ -1588,7 +1588,8 @@ function cloudCall(params,onOk,onErr){
   var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k])}).join('&');
   var s=document.createElement('script');
   var done=false;
-  var timer=setTimeout(function(){if(!done){done=true;cleanup();onErr&&onErr('응답이 없습니다(시간 초과) — 인터넷 연결을 확인해 주세요')}},15000);
+  /* 구글 서버가 30초 넘게 걸리는 경우가 있어 넉넉히 기다립니다 */
+  var timer=setTimeout(function(){if(!done){done=true;cleanup();onErr&&onErr('응답이 없습니다(시간 초과) — 잠시 후 다시 시도해 주세요')}},60000);
   function cleanup(){clearTimeout(timer);try{delete window[cbName]}catch(e){window[cbName]=undefined}if(s.parentNode)s.parentNode.removeChild(s)}
   window[cbName]=function(json){
     if(done)return;done=true;cleanup();
@@ -1761,13 +1762,13 @@ function renderCloudList(){
   '<div class="wrap wide"><div class="row spread" style="margin-bottom:14px">'+
     '<h1 style="font-size:22px">전체 지원자 목록</h1>'+
     '<button class="btn small ghost" id="btnBack2">돌아가기</button>'+
-  '</div><div class="card" id="cloudBox"><div class="note">불러오는 중…</div></div></div>';
+  '</div><div class="card" id="cloudBox"><div class="note">불러오는 중… (처음 열 때는 20~30초 걸릴 수 있습니다)</div></div></div>';
   $('btnBack2').onclick=function(){go(S.finishedAt?'done':'start')};
   loadCloudList();
 }
 function loadCloudList(){
   var box=$('cloudBox');if(!box)return;
-  box.innerHTML='<div class="note">불러오는 중…</div>';
+  box.innerHTML='<div class="note">불러오는 중… (처음 열 때는 20~30초 걸릴 수 있습니다)</div>';
   cloudCall({action:'list',token:SEND_TOKEN},function(res){
     var items=dedupeCloudItems(res.items||[]);
     if(!items.length){box.innerHTML='<div class="note">아직 접수된 결과가 없습니다.</div>';return}
@@ -1796,7 +1797,7 @@ function loadCloudList(){
 }
 function openCloudItem(it){
   var box=$('cloudBox');if(!box)return;
-  box.innerHTML='<div class="note">'+esc(it.name)+'님 상세 결과를 불러오는 중…</div>';
+  box.innerHTML='<div class="note">'+esc(it.name)+'님 상세 결과를 불러오는 중… (20~30초 걸릴 수 있습니다)</div>';
   cloudCall({action:'get',token:SEND_TOKEN,id:it.id},function(res){
     var rec=res.item||{};
     rec.id=it.id; /* 서버 응답에는 접수ID가 없으므로 목록의 값을 넘겨줍니다(분석 저장에 필요) */
