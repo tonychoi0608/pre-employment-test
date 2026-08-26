@@ -133,7 +133,7 @@ function appendRow_(d, s, when, mailStat) {
   ss.getSheets()[0].appendRow([
     Utilities.formatDate(when, 'Asia/Seoul', 'yyyy-MM-dd HH:mm'),
     d.name || '', d.role || '', d.career || '', d.dur || '', d.grade || '',
-    s.self || '', s.sjt != null ? s.sjt : '', s.mech || '', s.drive || '', s.gap || '',
+    s.self || '', s.sjt != null ? s.sjt : '', s.mech ? ("'" + s.mech) : '', s.drive || '', s.gap || '',
     mailStat,
     d.ts != null ? String(d.ts) : '',
     d.data ? trim_(JSON.stringify(d.data)) : '',
