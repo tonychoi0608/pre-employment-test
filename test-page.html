@@ -211,6 +211,24 @@ h3{font-size:16px;font-weight:700;margin-bottom:6px}
 .essay-a.empty{color:var(--muted);font-style:italic}
 .pkg-area{width:100%;min-height:180px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink)}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
+
+/* AI 분석 결과 렌더링 */
+.an-body{font-size:15px;line-height:1.75;word-break:break-word}
+.an-body .an-h3{font-size:17px;font-weight:800;letter-spacing:-.01em;margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--line);color:var(--ink)}
+.an-body .an-h3:first-child{margin-top:0}
+.an-body .an-h4{font-size:15.5px;font-weight:700;margin:16px 0 6px;color:var(--accent-ink)}
+.an-body .an-p{margin:8px 0}
+.an-body .an-ul,.an-body .an-ol{margin:8px 0 8px 22px}
+.an-body .an-ul li,.an-body .an-ol li{margin:5px 0}
+.an-body strong{font-weight:800}
+.an-body code{background:var(--surface2);border-radius:4px;padding:1px 5px;font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.an-body .an-hr{border:none;border-top:1px solid var(--line);margin:18px 0}
+.an-tablewrap{overflow-x:auto;margin:10px 0}
+.an-body table{border-collapse:collapse;font-size:14px;min-width:100%}
+.an-body th,.an-body td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+.an-body th{background:var(--surface2);font-weight:700;white-space:nowrap}
+.an-meta{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.an-empty{color:var(--muted);font-size:14.5px;line-height:1.7}
 .toast{
   position:fixed;left:50%;bottom:30px;transform:translateX(-50%);
   background:var(--steel-deep);color:var(--steel-ink);padding:11px 22px;border-radius:99px;
@@ -754,6 +772,7 @@ var S={
   tabLeaves:0,
   shownAt:0,
   result:null,
+  analysis:null,   /* {저장일시, 내용} — 저장된 AI 분석 */
   demo:false,
   essayWarned:false
 };
@@ -869,7 +888,7 @@ function renderStart(){
 function resetState(){
   S.info={name:'',role:'',career:''};S.resume='';S.lik={};S.likIdx=0;S.sjt={};S.sjtIdx=0;S.sjtPhase=0;
   S.mech={};S.mechIdx=0;S.limbic={};S.limIdx=0;S.motive={rank:[],delay:-1};S.essay={};S.essayIdx=0;
-  S.startedAt=0;S.finishedAt=0;S.partT={};S._curPart=null;S.partStart=0;S.tabLeaves=0;S.result=null;S.demo=false;
+  S.startedAt=0;S.finishedAt=0;S.partT={};S._curPart=null;S.partStart=0;S.tabLeaves=0;S.result=null;S.analysis=null;S.demo=false;
 }
 
 /* ================= 정보 입력 ================= */
@@ -1354,9 +1373,18 @@ function computeAll(){
 function saveArchive(res){
   var arc=lsGet('gk_results')||[];
   arc.push({id:'r'+now(),name:S.info.name,role:S.info.role,career:S.info.career,ts:res.ts,
-    data:{res:res,info:S.info,resume:S.resume,lik:S.lik,sjt:S.sjt,mech:S.mech,limbic:S.limbic,motive:S.motive,essay:S.essay}});
+    data:{res:res,info:S.info,resume:S.resume,lik:S.lik,sjt:S.sjt,mech:S.mech,limbic:S.limbic,motive:S.motive,essay:S.essay,analysis:S.analysis}});
   while(arc.length>30)arc.shift();
   lsSet('gk_results',arc);
+}
+/* 로컬 보관함(이 기기)의 해당 접수건에도 분석 결과를 반영합니다. */
+function updateArchiveAnalysis(ts,analysis){
+  var arc=lsGet('gk_results')||[];
+  var changed=false;
+  for(var i=0;i<arc.length;i++){
+    if(arc[i].ts===ts&&arc[i].data){arc[i].data.analysis=analysis;changed=true}
+  }
+  if(changed)lsSet('gk_results',arc);
 }
 function loadArchived(id){
   var arc=lsGet('gk_results')||[];
@@ -1364,7 +1392,7 @@ function loadArchived(id){
     if(arc[i].id===id){
       var d=arc[i].data;
       S.info=d.info;S.resume=d.resume||'';S.lik=d.lik;S.sjt=d.sjt;S.mech=d.mech;S.limbic=d.limbic||{};S.motive=d.motive;S.essay=d.essay;
-      S.result=d.res;S.finishedAt=d.res.ts;S.demo=false;
+      S.result=d.res;S.analysis=d.analysis||null;S.finishedAt=d.res.ts;S.demo=false;
       return true;
     }
   }
@@ -1478,7 +1506,8 @@ function buildExportData(){
         return {번호:i2+1,A:p.a.t+' ['+DRIVE_NAMES[p.a.d]+']',B:p.b.t+' ['+DRIVE_NAMES[p.b.d]+']',
           선택:a2?(a2.v===0?'A':'B'):null,선택욕구:a2?DRIVE_NAMES[(a2.v===0?p.a:p.b).d]:null,응답시간ms:a2?a2.rt:null};
       })},
-    서술형응답:essays
+    서술형응답:essays,
+    AI분석:S.analysis||undefined
   };
 }
 function mapTraitNames(obj){
@@ -1499,6 +1528,7 @@ function buildMotiveSummary(r){
 }
 function buildPackage(){
   var data=buildExportData();
+  if(data.AI분석)delete data.AI분석;
   return AI_PROMPT+'\n\n===== 검사 데이터 (JSON) =====\n'+JSON.stringify(data,null,1)+
     '\n\n===== 이력서 =====\n'+(S.resume?S.resume:'제출되지 않음 — 이력서 파일이 별도로 있으면 이 대화에 함께 첨부해 주세요.');
 }
@@ -1562,16 +1592,153 @@ function cloudCall(params,onOk,onErr){
   s.src=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+qs+'&callback='+cbName;
   document.body.appendChild(s);
 }
+/* ================= AI 분석 결과 (붙여넣기 저장 · 렌더링) ================= */
+/* Claude가 만들어 준 마크다운 리포트를 읽기 좋은 HTML로 바꿉니다. */
+function mdInline(t){
+  t=esc(t);
+  t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>');
+  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  return t;
+}
+function mdCells(line){
+  var s=line.trim().replace(/^\|/,'').replace(/\|$/,'');
+  return s.split('|').map(function(c){return c.trim()});
+}
+function mdIsSep(line){return /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(line)&&line.indexOf('-')>=0}
+function mdToHtml(md){
+  var lines=String(md||'').replace(/\r\n/g,'\n').split('\n');
+  var out=[],list=null;
+  function closeList(){if(list){out.push(list==='ul'?'</ul>':'</ol>');list=null}}
+  for(var i=0;i<lines.length;i++){
+    var t=lines[i].trim();
+    if(!t){closeList();continue}
+    /* 표: |머리|머리| 다음 줄이 |---|---| 인 경우 */
+    if(t.charAt(0)==='|'&&i+1<lines.length&&mdIsSep(lines[i+1])){
+      closeList();
+      var head=mdCells(t),body=[];
+      i+=2;
+      while(i<lines.length&&lines[i].trim().charAt(0)==='|'){body.push(mdCells(lines[i].trim()));i++}
+      i--;
+      var tb='<div class="an-tablewrap"><table><tr>'+head.map(function(c){return '<th>'+mdInline(c)+'</th>'}).join('')+'</tr>';
+      for(var b=0;b<body.length;b++){
+        tb+='<tr>'+body[b].map(function(c){return '<td>'+mdInline(c)+'</td>'}).join('')+'</tr>';
+      }
+      out.push(tb+'</table></div>');
+      continue;
+    }
+    var h=t.match(/^(#{1,6})\s+(.*)$/);
+    if(h){closeList();var cls=h[1].length<=2?'an-h3':'an-h4';var tag=h[1].length<=2?'h3':'h4';
+      out.push('<'+tag+' class="'+cls+'">'+mdInline(h[2])+'</'+tag+'>');continue}
+    if(/^(-{3,}|\*{3,}|_{3,})$/.test(t)){closeList();out.push('<hr class="an-hr">');continue}
+    var ul=t.match(/^[-*+]\s+(.*)$/);
+    if(ul){if(list!=='ul'){closeList();out.push('<ul class="an-ul">');list='ul'}
+      out.push('<li>'+mdInline(ul[1])+'</li>');continue}
+    var ol=t.match(/^(\d+)[.)]\s+(.*)$/);
+    if(ol){if(list!=='ol'){closeList();out.push('<ol class="an-ol">');list='ol'}
+      out.push('<li>'+mdInline(ol[2])+'</li>');continue}
+    closeList();
+    out.push('<p class="an-p">'+mdInline(t)+'</p>');
+  }
+  closeList();
+  return out.join('');
+}
+/* 분석 결과를 클라우드에 저장 — 원본 기록에 AI분석 항목을 넣어 같은 접수건으로 다시 보냅니다.
+   (같은 접수ID로 저장되므로 조회 시 최신 것 하나만 보입니다) */
+function saveAnalysisToCloud(rec, text, onDone){
+  if(!SEND_URL){onDone('전송 주소가 설정되어 있지 않습니다');return}
+  if(!window.fetch){onDone('이 브라우저에서는 저장할 수 없습니다');return}
+  if(!/^\d+$/.test(String(rec.ts))){onDone('이 접수 건은 접수번호가 없어 저장할 수 없습니다 — "클라우드로 전송"을 먼저 눌러 주세요');return}
+  var data=rec.data;
+  var info=data.지원자정보||{};
+  data.AI분석={저장일시:new Date().toLocaleString('ko-KR'),내용:text};
+  var sum=data.점수요약_100점||{},self=sum.자기보고||{},lim=(sum.동기프로필||{}).타고난동기_림빅양자택일,p=lim&&lim.강도100;
+  var payload={
+    token:SEND_TOKEN,name:info.이름,role:info.지원직무,career:info.경력,
+    ts:Number(rec.ts),/* 문자열로 보내면 서버가 날짜로 해석하지 못합니다 */
+    dur:(data.검사정보||{}).총소요,grade:(data.신뢰도지표||{}).종합등급,
+    summary:{
+      self:'도전 '+self.도전정신+' · 끈기 '+self.끈기+' · 문제해결 '+self.문제해결력+' · 조직융화 '+self.조직융화+' · 성실안전 '+self.성실안전+' · 정서안정 '+self.정서안정,
+      sjt:(sum.상황판단||{}).평균,mech:sum.실무감각,
+      drive:p?('지배 '+p.지배욕+'% · 자극 '+p.자극욕+'% · 균형 '+p.균형욕+'%'):'',
+      gap:((sum.동기프로필||{}).타고난동기와_직장조건의_괴리||'').indexOf('있음')===0?'있음':'없음'
+    },
+    data:data,package:rec.package||''
+  };
+  var ctl=window.AbortController?new AbortController():null;
+  var tmr=ctl?setTimeout(function(){ctl.abort()},45000):null;
+  fetch(SEND_URL,{method:'POST',body:JSON.stringify(payload),signal:ctl?ctl.signal:undefined})
+    .then(function(res){if(!res.ok)throw new Error('http '+res.status);return res.json()})
+    .then(function(j){if(tmr)clearTimeout(tmr);onDone(j&&j.ok?null:'서버가 저장을 거부했습니다')})
+    .catch(function(){if(tmr)clearTimeout(tmr);onDone('전송에 실패했습니다 — 인터넷 연결을 확인해 주세요')});
+}
+/* 분석 카드 HTML — 저장된 분석이 있으면 보여주고, 없으면 붙여넣기 칸을 보여줍니다. */
+function analysisCardHTML(an,idSuffix){
+  var s=idSuffix||'';
+  if(an&&an.내용){
+    return '<div class="row spread"><h2>AI 심층 분석</h2>'+
+        '<button class="btn small ghost no-print" id="btnAnEdit'+s+'">다시 붙여넣기</button></div>'+
+      '<div class="an-meta">'+esc(an.저장일시||'')+' 저장됨</div>'+
+      '<div class="an-body" id="anBody'+s+'">'+mdToHtml(an.내용)+'</div>'+
+      '<div id="anEditBox'+s+'" class="no-print" style="display:none;margin-top:14px">'+
+        '<textarea class="pkg-area" id="anInput'+s+'" style="min-height:200px;font-family:inherit;font-size:14px" placeholder="새 분석 결과를 붙여넣고 저장하세요"></textarea>'+
+        '<div class="row mt16"><button class="btn accent" id="btnAnSave'+s+'">저장</button>'+
+        '<button class="btn ghost" id="btnAnCancel'+s+'">취소</button>'+
+        '<span class="note" id="anStat'+s+'"></span></div></div>';
+  }
+  return '<h2>AI 심층 분석</h2>'+
+    '<div class="an-empty no-print">아직 저장된 분석이 없습니다.<br>'+
+    '① 위 <b>분석 프롬프트 + 데이터 복사</b> 버튼을 누르고 → ② <b>Claude</b>(claude.ai)에 붙여넣어 분석을 받은 뒤 → ③ 그 결과를 아래에 붙여넣고 저장하면, 다른 기기·휴대폰에서도 결과와 함께 볼 수 있습니다.</div>'+
+    '<div class="no-print" style="margin-top:14px">'+
+      '<textarea class="pkg-area" id="anInput'+s+'" style="min-height:200px;font-family:inherit;font-size:14px" placeholder="Claude가 만들어 준 분석 리포트를 여기에 붙여넣으세요"></textarea>'+
+      '<div class="row mt16"><button class="btn accent" id="btnAnSave'+s+'">분석 결과 저장</button>'+
+      '<span class="note" id="anStat'+s+'"></span></div></div>';
+}
+/* 분석 카드의 버튼들을 연결합니다. getRec()은 {ts, data, package}를 돌려줘야 합니다. */
+function wireAnalysisCard(idSuffix,getRec,onSaved){
+  var s=idSuffix||'';
+  var edit=$('btnAnEdit'+s);
+  if(edit)edit.onclick=function(){
+    var box=$('anEditBox'+s);
+    box.style.display=box.style.display==='none'?'block':'none';
+  };
+  var cancel=$('btnAnCancel'+s);
+  if(cancel)cancel.onclick=function(){$('anEditBox'+s).style.display='none'};
+  var save=$('btnAnSave'+s);
+  if(save)save.onclick=function(){
+    var ta=$('anInput'+s),stat=$('anStat'+s);
+    var txt=(ta.value||'').trim();
+    if(txt.length<50){stat.innerHTML='<span style="color:var(--bad)">분석 내용이 너무 짧습니다. 전체를 붙여넣어 주세요.</span>';return}
+    var rec=getRec();
+    if(!rec||!rec.data){stat.innerHTML='<span style="color:var(--bad)">저장할 검사 데이터를 찾지 못했습니다.</span>';return}
+    save.disabled=true;
+    stat.innerHTML='저장하는 중…';
+    saveAnalysisToCloud(rec,txt,function(err){
+      save.disabled=false;
+      if(err){stat.innerHTML='<span style="color:var(--bad)">'+esc(err)+'</span>';return}
+      stat.innerHTML='<span style="color:var(--good)">저장되었습니다</span>';
+      toastMsg('AI 분석 결과가 저장되었습니다');
+      if(onSaved)onSaved(txt);
+    });
+  };
+}
+
 /* 같은 지원자가 여러 번 전송되어 시트에 중복 기록된 경우 한 줄로 합칩니다.
    (이름+응시일시가 같으면 동일인 — 상세 데이터가 있는 쪽을 남깁니다) */
 function dedupeCloudItems(items){
-  var pos={},out=[];
+  var byId={},byName={},out=[];
   for(var i=0;i<items.length;i++){
     var it=items[i];
-    var key=(it.name||'')+'|'+(it.when||'');
-    if(pos[key]===undefined){pos[key]=out.length;out.push(it);continue}
-    var cur=out[pos[key]];
-    if(it.hasDetail&&!cur.hasDetail)out[pos[key]]=it; /* 상세 있는 쪽 우선 */
+    /* 접수ID가 같거나(재전송), 이름+응시일시가 같으면(구버전 기록) 같은 접수건입니다. */
+    var idKey=/^\d+$/.test(String(it.id))?String(it.id):null;
+    var nmKey=(it.name||'')+'|'+(it.when||'');
+    var idx=-1; /* var는 반복마다 초기화되지 않으므로 반드시 대입해 둡니다 */
+    if(idKey!==null&&byId[idKey]!==undefined)idx=byId[idKey];
+    else if(byName[nmKey]!==undefined)idx=byName[nmKey];
+    if(idx<0){idx=out.length;out.push(it)}
+    else if(it.hasDetail&&!out[idx].hasDetail)out[idx]=it; /* 상세 있는 쪽 우선 */
+    if(idKey!==null)byId[idKey]=idx;
+    byName[nmKey]=idx;
   }
   return out;
 }
@@ -1624,7 +1791,9 @@ function openCloudItem(it){
   var box=$('cloudBox');if(!box)return;
   box.innerHTML='<div class="note">'+esc(it.name)+'님 상세 결과를 불러오는 중…</div>';
   cloudCall({action:'get',token:SEND_TOKEN,id:it.id},function(res){
-    renderCloudReport(res.item);
+    var rec=res.item||{};
+    rec.id=it.id; /* 서버 응답에는 접수ID가 없으므로 목록의 값을 넘겨줍니다(분석 저장에 필요) */
+    renderCloudReport(rec);
   },function(err){
     box.innerHTML='<div class="warn-inline" style="display:block">불러오지 못했습니다: '+esc(err)+'</div>'+
       '<button class="btn small mt16" id="btnBackList">목록으로</button>';
@@ -1714,13 +1883,28 @@ function renderCloudReport(item){
    '</div>'+
    '<div class="card"><div class="row spread"><h2>실무 감각</h2><span class="badge '+(mechNum/mechTot>=0.8?'good':(mechNum/mechTot>=0.6?'warn':'bad'))+'">'+mechTxt+'</span></div>'+mechHtml+'</div>'+
    '<div class="card"><h2>경험 서술 (원문)</h2>'+(essayHtml||'<div class="note">없음</div>')+'</div>'+
-   '<div class="card no-print" style="border-color:var(--accent);border-width:1.5px"><h2>AI 심층 분석</h2>'+
-    (pkg
-      ?'<p style="font-size:15px;margin-top:4px">아래 버튼으로 분석 프롬프트 + 전체 데이터를 복사한 뒤 Claude 새 대화에 붙여넣으세요.</p><div class="row mt16"><button class="btn accent" id="btnCloudCopy">분석 프롬프트 + 데이터 복사</button></div><textarea class="pkg-area mt16" id="pkgArea2" style="display:none" readonly></textarea>'
-      :'<div class="note">이 접수 건은 AI 분석용 원본 데이터가 저장되어 있지 않습니다(기능 도입 이전 접수분).</div>')+
-   '</div>';
+   (pkg&&!(x.AI분석&&x.AI분석.내용)
+     ?'<div class="card no-print"><h3 style="font-size:15px;font-weight:700;margin-bottom:6px">분석 데이터 복사</h3>'+
+      '<p class="note">아래 버튼을 눌러 <b>분석 프롬프트 + 전체 데이터</b>를 복사한 뒤 Claude 새 대화에 붙여넣으세요.</p>'+
+      '<div class="row mt16"><button class="btn" id="btnCloudCopy">분석 프롬프트 + 데이터 복사</button></div>'+
+      '<textarea class="pkg-area mt16" id="pkgArea2" style="display:none" readonly></textarea></div>'
+     :'')+
+   '<div class="card" style="border-color:var(--accent);border-width:1.5px" id="anCard">'+
+     analysisCardHTML(x.AI분석,'C')+
+   '</div>'+
+   (pkg&&(x.AI분석&&x.AI분석.내용)
+     ?'<div class="row no-print" style="margin-top:6px"><button class="linkish" id="btnCloudCopy">분석 프롬프트 + 데이터 다시 복사</button></div>'+
+      '<textarea class="pkg-area no-print" id="pkgArea2" style="display:none" readonly></textarea>'
+     :'');
 
   $('btnToList').onclick=renderCloudList;
+  function getCloudRec(){return {ts:item.id,data:x,package:pkg}}
+  function afterCloudSave(txt){
+    x.AI분석={저장일시:new Date().toLocaleString('ko-KR'),내용:txt};
+    $('anCard').innerHTML=analysisCardHTML(x.AI분석,'C');
+    wireAnalysisCard('C',getCloudRec,afterCloudSave);
+  }
+  wireAnalysisCard('C',getCloudRec,afterCloudSave);
   $('btnCloudPrint').onclick=function(){try{window.print()}catch(e){toastMsg('브라우저 인쇄 메뉴(Ctrl+P)를 이용해 주세요')}};
   var bc=$('btnCloudCopy');
   if(bc)bc.onclick=function(){
@@ -1999,6 +2183,11 @@ function renderReport(){
    '</div>'+
 
    (SEND_URL&&!S.demo?(
+   '<div class="card" style="border-color:var(--accent);border-width:1.5px" id="anCardL">'+
+     analysisCardHTML(S.analysis,'L')+
+   '</div>'):'')+
+
+   (SEND_URL&&!S.demo?(
    '<div class="card no-print"><h2>클라우드 저장</h2>'+
     '<p class="note">이 결과를 회사 클라우드(구글 시트)에 (다시) 전송합니다. 전송해 두면 다른 기기·휴대폰에서도 담당자 코드로 조회할 수 있습니다.</p>'+
     '<div class="row mt16"><button class="btn" id="btnResendCloud">클라우드로 전송</button></div>'+
@@ -2026,6 +2215,19 @@ function renderReport(){
   wirePdf('btnPdf2','filePdf2','pdfStat2','fResume2');
   var btnCL=$('btnCloudList');if(btnCL)btnCL.onclick=function(){go('cloudlist')};
   var btnRC=$('btnResendCloud');if(btnRC)btnRC.onclick=function(){S.sendOk=false;sendResults('sendStat2')};
+  if($('anCardL')){
+    var getLocalRec=function(){
+      S.resume=$('fResume2')?$('fResume2').value.trim():S.resume;
+      return {ts:r.ts,data:buildExportData(),package:buildPackage()};
+    };
+    var afterLocalSave=function(txt){
+      S.analysis={저장일시:new Date().toLocaleString('ko-KR'),내용:txt};
+      updateArchiveAnalysis(r.ts,S.analysis);
+      $('anCardL').innerHTML=analysisCardHTML(S.analysis,'L');
+      wireAnalysisCard('L',getLocalRec,afterLocalSave);
+    };
+    wireAnalysisCard('L',getLocalRec,afterLocalSave);
+  }
   var selArc=$('selArc');
   if(selArc)selArc.onchange=function(){if(this.value&&loadArchived(this.value))renderReport()};
   $('btnDel').onclick=function(){
