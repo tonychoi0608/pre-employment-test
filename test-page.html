@@ -1224,6 +1224,7 @@ function renderDone(){
 /* ================= 게이트 ================= */
 function renderGate(){
   setTop('면접 담당자 확인');
+  warmCloud(); /* 코드를 입력하는 동안 구글 서버를 미리 깨워 둡니다 */
   $('main').innerHTML=
   '<div class="wrap"><div class="card gatebox center" style="padding:36px 28px">'+
     '<h2>면접 담당자 확인</h2>'+
@@ -1743,6 +1744,32 @@ function dedupeCloudItems(items){
   }
   return out;
 }
+/* 구글 앱스 스크립트는 한동안 쓰지 않으면 잠들고, 깨우는 데 30~40초가 걸립니다.
+   (측정: 시트를 읽지 않는 빈 요청도 첫 호출은 41초, 이후는 1~3초)
+   그래서 결과를 실제로 조회하기 전에 미리 가벼운 신호를 보내 서버를 깨워 둡니다. */
+var _warmAt=0;
+function warmCloud(){
+  if(!SEND_URL)return;
+  if(now()-_warmAt<90000)return; /* 90초 안에 이미 깨웠으면 생략 */
+  _warmAt=now();
+  var url=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+'warm=1';
+  try{
+    if(window.fetch){fetch(url,{mode:'no-cors',cache:'no-store'})['catch'](function(){})}
+    else{var img=new Image();img.src=url}
+  }catch(e){}
+}
+/* 진행 표시 — 몇 초째 기다리는 중인지 보여 줘야 멈춘 것으로 오해하지 않습니다. */
+function startLoadTimer(box,label){
+  var t0=now();
+  function paint(){
+    var s=Math.round((now()-t0)/1000);
+    box.innerHTML='<div class="note">'+esc(label)+' <b>'+s+'초</b>'+
+      (s>=8?'<br><span style="font-size:13px">구글 서버가 깨어나는 중입니다. 처음 열 때는 30초 정도 걸릴 수 있습니다.</span>':'')+
+      '</div>';
+  }
+  paint();
+  return setInterval(paint,1000);
+}
 function fmtCloudWhen(w){
   if(!w)return '-';
   var d=new Date(w);
@@ -1761,10 +1788,36 @@ function renderCloudList(){
 }
 function loadCloudList(){
   var box=$('cloudBox');if(!box)return;
-  box.innerHTML='<div class="note">불러오는 중… (처음 열 때는 20~30초 걸릴 수 있습니다)</div>';
+  warmCloud();
+  /* 지난번에 받아 둔 목록이 있으면 먼저 보여 주고, 최신 내용은 뒤이어 갱신합니다. */
+  var cache=lsGet('gk_cloud_list');
+  var shownFromCache=false;
+  if(cache&&cache.items&&cache.items.length){
+    paintCloudList(box,cache.items,true);
+    shownFromCache=true;
+  }
+  var timer=shownFromCache?null:startLoadTimer(box,'지원자 목록을 불러오는 중…');
+  function stop(){if(timer)clearInterval(timer)}
   cloudCall({action:'list',token:SEND_TOKEN},function(res){
+    stop();
     var items=dedupeCloudItems(res.items||[]);
+    lsSet('gk_cloud_list',{ts:now(),items:items});
     if(!items.length){box.innerHTML='<div class="note">아직 접수된 결과가 없습니다.</div>';return}
+    paintCloudList(box,items,false);
+  },function(err){
+    stop();
+    if(shownFromCache){
+      var note=$('cloudStale');
+      if(note)note.innerHTML='<span style="color:var(--warn)">최신 목록을 불러오지 못했습니다 — 아래는 마지막으로 받아 둔 내용입니다.</span> <button class="linkish" id="btnRetryCloud">다시 시도</button>';
+      var b0=$('btnRetryCloud');if(b0)b0.onclick=loadCloudList;
+      return;
+    }
+    box.innerHTML='<div class="warn-inline" style="display:block">목록을 불러오지 못했습니다: '+esc(err)+'</div>'+
+      '<button class="btn small mt16" id="btnRetryCloud">다시 시도</button>';
+    var b=$('btnRetryCloud');if(b)b.onclick=loadCloudList;
+  });
+}
+function paintCloudList(box,items,fromCache){
     var rows=items.map(function(it,idx){
       var g=it.grade||'';
       var badge=g==='양호'?'good':(g==='주의'?'warn':(g?'bad':'neutral'));
@@ -1776,26 +1829,24 @@ function loadCloudList(){
         '<td class="note" style="text-align:right">'+(it.hasDetail?'상세 보기 →':'요약만(과거 접수)')+'</td>'+
       '</tr>';
     }).join('');
-    box.innerHTML='<div class="note" style="margin-bottom:10px">총 '+items.length+'건 · 최신순</div>'+
+    box.innerHTML='<div class="note" style="margin-bottom:10px">총 '+items.length+'건 · 최신순'+
+      '<span id="cloudStale">'+(fromCache?' · <span style="color:var(--muted)">최신 내용 확인 중…</span>':'')+'</span></div>'+
       '<div style="overflow-x:auto"><table class="mini-table"><tr><th>이름</th><th>직무·경력</th><th>응시일시</th><th>신뢰도</th><th></th></tr>'+rows+'</table></div>';
     var trs=box.querySelectorAll('.cloudRow');
     for(var i=0;i<trs.length;i++){
       trs[i].onclick=(function(it){return function(){openCloudItem(it)}})(items[parseInt(trs[i].getAttribute('data-idx'),10)]);
     }
-  },function(err){
-    box.innerHTML='<div class="warn-inline" style="display:block">목록을 불러오지 못했습니다: '+esc(err)+'</div>'+
-      '<button class="btn small mt16" id="btnRetryCloud">다시 시도</button>';
-    var b=$('btnRetryCloud');if(b)b.onclick=loadCloudList;
-  });
 }
 function openCloudItem(it){
   var box=$('cloudBox');if(!box)return;
-  box.innerHTML='<div class="note">'+esc(it.name)+'님 상세 결과를 불러오는 중… (20~30초 걸릴 수 있습니다)</div>';
+  var timer=startLoadTimer(box,esc(it.name)+'님 상세 결과를 불러오는 중…');
   cloudCall({action:'get',token:SEND_TOKEN,id:it.id},function(res){
+    clearInterval(timer);
     var rec=res.item||{};
     rec.id=it.id; /* 서버 응답에는 접수ID가 없으므로 목록의 값을 넘겨줍니다(분석 저장에 필요) */
     renderCloudReport(rec);
   },function(err){
+    clearInterval(timer);
     box.innerHTML='<div class="warn-inline" style="display:block">불러오지 못했습니다: '+esc(err)+'</div>'+
       '<button class="btn small mt16" id="btnBackList">목록으로</button>';
     var b=$('btnBackList');if(b)b.onclick=renderCloudList;
@@ -2250,5 +2301,6 @@ function renderReport(){
 
 /* ================= 시작 ================= */
 go('start');
+warmCloud(); /* 첫 조회가 30초 넘게 걸리지 않도록 미리 깨워 둡니다 */
 })();
 </script>
