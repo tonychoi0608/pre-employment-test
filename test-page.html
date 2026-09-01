@@ -1576,22 +1576,60 @@ function sendResults(elId){
 }
 
 /* ================= 클라우드 조회 (관리자 · 어디서든) ================= */
-function cloudCall(params,onOk,onErr){
+/* 서버에서 자료를 받아옵니다.
+   fetch를 먼저 씁니다(서버가 Access-Control-Allow-Origin: * 를 주므로 가능).
+   fetch는 실패 이유를 알려주고, 광고 차단·보안 프로그램이 스크립트 태그를 막는 상황에도
+   영향을 덜 받습니다. 옛 브라우저나 fetch가 막힌 환경을 대비해 스크립트 방식도 남겨 둡니다. */
+function cloudQS(params){
+  return Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k])}).join('&');
+}
+function cloudCall(params,onOk,onErr,_retry){
   if(!SEND_URL){onErr&&onErr('전송 주소가 설정되어 있지 않습니다');return}
-  var cbName='gkcb_'+now()+'_'+Math.floor(Math.random()*1e6);
-  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k])}).join('&');
-  var s=document.createElement('script');
-  var done=false;
-  /* 구글 서버가 30초 넘게 걸리는 경우가 있어 넉넉히 기다립니다 */
-  var timer=setTimeout(function(){if(!done){done=true;cleanup();onErr&&onErr('응답이 없습니다(시간 초과) — 잠시 후 다시 시도해 주세요')}},60000);
-  function cleanup(){clearTimeout(timer);try{delete window[cbName]}catch(e){window[cbName]=undefined}if(s.parentNode)s.parentNode.removeChild(s)}
-  window[cbName]=function(json){
-    if(done)return;done=true;cleanup();
+  var url=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+cloudQS(params);
+  function fail(msg){
+    /* 일시적인 실패가 잦아 한 번은 자동으로 다시 시도합니다 */
+    if(!_retry){setTimeout(function(){cloudCall(params,onOk,onErr,1)},1500);return}
+    onErr&&onErr(msg);
+  }
+  function handle(json){
     if(json&&json.ok)onOk&&onOk(json);
     else onErr&&onErr((json&&json.err)||'알 수 없는 오류');
+  }
+  if(window.fetch){
+    var done=false;
+    var ctl=window.AbortController?new AbortController():null;
+    var timer=setTimeout(function(){if(!done){done=true;if(ctl)ctl.abort()}},60000);
+    fetch(url,{cache:'no-store',signal:ctl?ctl.signal:undefined})
+      .then(function(res){
+        if(!res.ok)throw new Error('서버 응답 오류 (HTTP '+res.status+')');
+        return res.json();
+      })
+      .then(function(json){
+        if(done)return;done=true;clearTimeout(timer);
+        handle(json);
+      })
+      ['catch'](function(e){
+        if(done&&!(e&&e.name==='AbortError'))return;
+        done=true;clearTimeout(timer);
+        var msg=(e&&e.name==='AbortError')
+          ?'응답이 너무 오래 걸립니다 — 잠시 후 다시 시도해 주세요'
+          :((e&&e.message&&e.message.indexOf('HTTP')>=0)?e.message:'서버에 연결하지 못했습니다 — 잠시 후 다시 시도해 주세요');
+        fail(msg);
+      });
+    return;
+  }
+  /* fetch를 쓸 수 없는 환경용 예비 경로 */
+  var cbName='gkcb_'+now()+'_'+Math.floor(Math.random()*1e6);
+  var s=document.createElement('script');
+  var done2=false;
+  var timer2=setTimeout(function(){if(!done2){done2=true;cleanup();fail('응답이 없습니다(시간 초과) — 잠시 후 다시 시도해 주세요')}},60000);
+  function cleanup(){clearTimeout(timer2);try{delete window[cbName]}catch(e){window[cbName]=undefined}if(s.parentNode)s.parentNode.removeChild(s)}
+  window[cbName]=function(json){
+    if(done2)return;done2=true;cleanup();
+    handle(json);
   };
-  s.onerror=function(){if(done)return;done=true;cleanup();onErr&&onErr('네트워크 오류 — 인터넷 연결을 확인해 주세요')};
-  s.src=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+qs+'&callback='+cbName;
+  s.onerror=function(){if(done2)return;done2=true;cleanup();fail('서버에 연결하지 못했습니다 — 잠시 후 다시 시도해 주세요')};
+  s.src=url+'&callback='+cbName;
   document.body.appendChild(s);
 }
 /* ================= AI 분석 결과 (붙여넣기 저장 · 렌더링) ================= */
@@ -1754,7 +1792,7 @@ function warmCloud(){
   _warmAt=now();
   var url=SEND_URL+(SEND_URL.indexOf('?')>=0?'&':'?')+'warm=1';
   try{
-    if(window.fetch){fetch(url,{mode:'no-cors',cache:'no-store'})['catch'](function(){})}
+    if(window.fetch){fetch(url,{cache:'no-store'})['catch'](function(){})}
     else{var img=new Image();img.src=url}
   }catch(e){}
 }
