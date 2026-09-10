@@ -1893,20 +1893,38 @@ function renderCloudList(){
   $('main').innerHTML=
   '<div class="wrap wide"><div class="row spread" style="margin-bottom:14px">'+
     '<h1 style="font-size:22px">전체 지원자 목록</h1>'+
-    '<button class="btn small ghost" id="btnBack2">돌아가기</button>'+
+    '<span class="row" style="gap:6px">'+
+      '<button class="btn small" id="btnReloadCloud">새로고침</button>'+
+      '<button class="btn small ghost" id="btnBack2">돌아가기</button>'+
+    '</span>'+
   '</div><div class="card" id="cloudBox"><div class="note">불러오는 중… (처음 열 때는 20~30초 걸릴 수 있습니다)</div></div></div>';
   $('btnBack2').onclick=function(){go(S.finishedAt?'done':'start')};
+  var rl=$('btnReloadCloud');
+  if(rl)rl.onclick=function(){loadCloudList(true)};
   loadCloudList();
 }
-function loadCloudList(){
+/* "3분 전"처럼 사람이 읽기 쉬운 표현 */
+function agoText(ts){
+  if(!ts)return '';
+  var m=Math.floor((now()-ts)/60000);
+  if(m<1)return '방금';
+  if(m<60)return m+'분 전';
+  var h=Math.floor(m/60);
+  if(h<24)return h+'시간 전';
+  return Math.floor(h/24)+'일 전';
+}
+function loadCloudList(force){
   var box=$('cloudBox');if(!box)return;
   warmCloud();
-  /* 지난번에 받아 둔 목록이 있으면 먼저 보여 주고, 최신 내용은 뒤이어 갱신합니다. */
-  var cache=lsGet('gk_cloud_list');
-  var shownFromCache=false;
+  /* 지난번에 받아 둔 목록이 있으면 먼저 보여 주고, 최신 내용은 뒤이어 갱신합니다.
+     새로고침을 누른 경우(force)에는 캐시를 쓰지 않고 처음부터 다시 받습니다. */
+  var cache=force?null:lsGet('gk_cloud_list');
+  /* 하루가 지난 캐시는 새 지원자가 빠져 있을 수 있으므로 쓰지 않고 새로 받습니다 */
+  if(cache&&cache.ts&&now()-cache.ts>86400000)cache=null;
+  var shownFromCache=false,cacheCount=0;
   if(cache&&cache.items&&cache.items.length){
-    paintCloudList(box,cache.items,true);
-    shownFromCache=true;
+    paintCloudList(box,cache.items,true,cache.ts);
+    shownFromCache=true;cacheCount=cache.items.length;
   }
   var timer=shownFromCache?null:startLoadTimer(box,'지원자 목록을 불러오는 중…');
   function stop(){if(timer)clearInterval(timer)}
@@ -1916,20 +1934,21 @@ function loadCloudList(){
     lsSet('gk_cloud_list',{ts:now(),items:items});
     if(!items.length){box.innerHTML='<div class="note">아직 접수된 결과가 없습니다.</div>';return}
     paintCloudList(box,items,false);
+    if(shownFromCache&&items.length!==cacheCount)toastMsg('목록을 최신으로 갱신했습니다 ('+items.length+'건)');
   },function(err){
     stop();
     if(shownFromCache){
       var note=$('cloudStale');
-      if(note)note.innerHTML='<span style="color:var(--warn)">최신 목록을 불러오지 못했습니다 — 아래는 마지막으로 받아 둔 내용입니다.</span> <button class="linkish" id="btnRetryCloud">다시 시도</button>';
-      var b0=$('btnRetryCloud');if(b0)b0.onclick=loadCloudList;
+      if(note)note.innerHTML=' · <span style="color:var(--bad);font-weight:600">최신 목록을 못 받았습니다 — 아래는 예전에 받아 둔 내용입니다.</span> <button class="linkish" id="btnRetryCloud">다시 시도</button>';
+      var b0=$('btnRetryCloud');if(b0)b0.onclick=function(){loadCloudList(true)};
       return;
     }
     box.innerHTML='<div class="warn-inline" style="display:block">목록을 불러오지 못했습니다: '+esc(err)+'</div>'+
       '<button class="btn small mt16" id="btnRetryCloud">다시 시도</button>';
-    var b=$('btnRetryCloud');if(b)b.onclick=loadCloudList;
+    var b=$('btnRetryCloud');if(b)b.onclick=function(){loadCloudList(true)};
   });
 }
-function paintCloudList(box,items,fromCache){
+function paintCloudList(box,items,fromCache,cacheTs){
     var rows=items.map(function(it,idx){
       var g=it.grade||'';
       var badge=g==='양호'?'good':(g==='주의'?'warn':(g?'bad':'neutral'));
@@ -1942,7 +1961,7 @@ function paintCloudList(box,items,fromCache){
       '</tr>';
     }).join('');
     box.innerHTML='<div class="note" style="margin-bottom:10px">총 '+items.length+'건 · 최신순'+
-      '<span id="cloudStale">'+(fromCache?' · <span style="color:var(--muted)">최신 내용 확인 중…</span>':'')+'</span></div>'+
+      '<span id="cloudStale">'+(fromCache?' · <b>'+esc(agoText(cacheTs))+'</b> 받아 둔 목록 · <span style="color:var(--accent-ink)">최신 확인 중…</span>':'')+'</span></div>'+
       '<div style="overflow-x:auto"><table class="mini-table"><tr><th>이름</th><th>직무·경력</th><th>응시일시</th><th>신뢰도</th><th></th></tr>'+rows+'</table></div>';
     var trs=box.querySelectorAll('.cloudRow');
     for(var i=0;i<trs.length;i++){
