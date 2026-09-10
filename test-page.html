@@ -250,6 +250,71 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:20px 0}
   .card{box-shadow:none;break-inside:avoid}
   .wrap{max-width:100%;padding:0}
 }
+
+/* ===== 인쇄 전용 리포트 (면접관용 / 면접자용) =====
+   화면 레이아웃을 그대로 찍지 않고, 종이용으로 따로 조립한 문서를 인쇄합니다.
+   색은 CSS 변수 대신 고정값을 써서 다크 모드에서도 흰 종이에 맞게 나옵니다. */
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:13mm 13mm 15mm}
+  html,body{background:#fff !important;background-image:none !important}
+  body.printing #main,body.printing .top,body.printing .pbar,body.printing .toast{display:none !important}
+  body.printing #printArea{display:block !important}
+  #printArea,#printArea *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+#printArea{
+  --bg:#fff;--surface:#fff;--surface2:#EEF0EE;--ink:#1B2430;--muted:#5B6570;--line:#CDD3D8;
+  --steel:#2E4057;--steel-deep:#22303F;--steel-ink:#fff;--accent:#E8630A;--accent-ink:#B44E04;--accent-soft:#FBE9DC;
+  --good:#2E7D4F;--good-soft:#E3F0E8;--warn:#A8730A;--warn-soft:#F6EEDC;--bad:#BE3D2A;--bad-soft:#F7E4E0;
+  color:#1B2430;font-size:10.5pt;line-height:1.55;
+}
+.pr{max-width:182mm;margin:0 auto}
+.pr-head{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2.5px solid #2E4057;padding-bottom:8px;margin-bottom:12px}
+.pr-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:12.5pt}
+.pr-title{font-size:18pt;font-weight:800;letter-spacing:-.02em;margin-top:3px}
+.pr-conf{font-size:9pt;color:#BE3D2A;font-weight:700;text-align:right}
+.pr-sub{font-size:9pt;color:#5B6570;text-align:right;line-height:1.5}
+.pr-info{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10.2pt}
+.pr-info td{padding:5px 8px;border:1px solid #CDD3D8}
+.pr-info td.k{background:#EEF0EE;font-weight:700;width:17%;white-space:nowrap}
+.pr-sec{margin:13px 0 0;break-inside:avoid}
+.pr-sec.allow{break-inside:auto}
+.pr-sec h2{font-size:12.5pt;font-weight:800;margin:0 0 8px;padding-bottom:4px;border-bottom:1.5px solid #CDD3D8;letter-spacing:-.01em;color:#1B2430}
+.pr-sec h2 .tag{font-size:9pt;font-weight:600;color:#5B6570;margin-left:8px}
+.pr-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.pr-radar{display:flex;justify-content:center}
+.pr-radar svg{width:225px;height:225px}
+.pr-bars{display:flex;flex-direction:column;gap:7px}
+.pr-bar .r1{display:flex;justify-content:space-between;font-size:10pt;margin-bottom:2px}
+.pr-bar .r1 b{font-variant-numeric:tabular-nums}
+.pr-bar .tr{height:7px;background:#E6E9E7;border-radius:99px;overflow:hidden}
+.pr-bar .tr i{display:block;height:100%;background:#2E4057;border-radius:99px}
+.pr-bar.orange .tr i{background:#E8630A}
+.pr-bar .desc{font-size:8.8pt;color:#5B6570;margin-top:1px}
+.pr-badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:9pt;font-weight:700;border:1px solid;margin:1px 2px 1px 0}
+.pr-badge.good{color:#2E7D4F;border-color:#2E7D4F;background:#E9F3ED}
+.pr-badge.warn{color:#A8730A;border-color:#A8730A;background:#F8F1DF}
+.pr-badge.bad{color:#BE3D2A;border-color:#BE3D2A;background:#F7E4E0}
+.pr-badge.neutral{color:#5B6570;border-color:#B8C0C7;background:#EEF0EE}
+.pr-tbl{width:100%;border-collapse:collapse;font-size:9.6pt}
+.pr-tbl th,.pr-tbl td{border:1px solid #CDD3D8;padding:5px 7px;text-align:left;vertical-align:top}
+.pr-tbl th{background:#EEF0EE;font-weight:700;white-space:nowrap}
+.pr-tbl td.c{text-align:center;white-space:nowrap}
+.pr-tbl tr{break-inside:avoid}
+.pr-note{font-size:9.2pt;color:#5B6570;margin-top:5px;line-height:1.5}
+.pr-essay{margin:8px 0;break-inside:avoid}
+.pr-essay .q{font-weight:700;font-size:10pt;margin-bottom:3px}
+.pr-essay .a{background:#F3F5F3;border-left:3px solid #2E4057;padding:7px 10px;font-size:10pt;white-space:pre-wrap;word-break:break-word;line-height:1.6}
+.pr-essay .a.empty{color:#5B6570;font-style:italic}
+.pr-break{break-before:page}
+.pr-foot{margin-top:18px;padding-top:8px;border-top:1px solid #CDD3D8;font-size:8.8pt;color:#5B6570;display:flex;justify-content:space-between;gap:12px}
+.pr-cand .pr-lead{font-size:10.8pt;line-height:1.7;margin:2px 0 8px}
+.pr-narr{background:#F3F5F3;border-radius:8px;padding:10px 14px;font-size:10.3pt;line-height:1.7;margin-top:8px}
+.pr-big{font-size:22pt;font-weight:800;color:#2E4057;line-height:1}
+#printArea .an-body{font-size:10.2pt}
+#printArea .an-body .an-h3{font-size:11.5pt;margin-top:14px}
+#printArea .an-body .an-h4{font-size:10.5pt}
+#printArea .an-body table{font-size:9.4pt}
 </style>
 
 <div class="top">
@@ -266,6 +331,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:20px 0}
 </div>
 <div class="pbar"><i id="pbarFill"></i></div>
 <main id="main"></main>
+<div id="printArea" aria-hidden="true"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -842,6 +908,7 @@ document.addEventListener('keydown',function(e){
 /* ================= 화면 전환 ================= */
 function go(screen){
   S.screen=screen;
+  S.cloudX=null;endPrint(); /* 화면이 바뀌면 인쇄용 상태는 버립니다 */
   var r={start:renderStart,info:renderInfo,guide:renderGuide,
     p2:function(){renderPartIntro(2)},likert:renderLikert,
     p3:function(){renderPartIntro(3)},sjt:renderSJT,
@@ -1946,7 +2013,8 @@ function renderCloudReport(item){
   box.innerHTML=
    '<div class="row spread no-print" style="margin-bottom:14px">'+
      '<button class="linkish" id="btnToList">← 전체 목록</button>'+
-     '<button class="btn small" id="btnCloudPrint">인쇄</button>'+
+     '<span class="row" style="gap:6px"><button class="btn small" id="btnCloudPrintI">면접관용 인쇄</button>'+
+     '<button class="btn small ghost" id="btnCloudPrintC">면접자용 인쇄</button></span>'+
    '</div>'+
    '<div class="grid2">'+
     '<div class="card"><h2>지원자</h2><dl class="kv">'+
@@ -1995,7 +2063,9 @@ function renderCloudReport(item){
     wireAnalysisCard('C',getCloudRec,afterCloudSave);
   }
   wireAnalysisCard('C',getCloudRec,afterCloudSave);
-  $('btnCloudPrint').onclick=function(){try{window.print()}catch(e){toastMsg('브라우저 인쇄 메뉴(Ctrl+P)를 이용해 주세요')}};
+  S.cloudX=x; /* Ctrl+P로 인쇄할 때도 이 결과를 쓰도록 보관 */
+  $('btnCloudPrintI').onclick=function(){printReport('interviewer',x)};
+  $('btnCloudPrintC').onclick=function(){printReport('candidate',x)};
   var bc=$('btnCloudCopy');
   if(bc)bc.onclick=function(){
     if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -2117,6 +2187,180 @@ function extractResume(f,st,done){
   fr2.readAsArrayBuffer(f);
 }
 
+/* ================= 인쇄용 리포트 (면접관용 / 면접자용) =================
+   화면을 그대로 찍지 않고 종이용 문서를 따로 조립합니다.
+   입력 x는 buildExportData()가 만드는 구조(클라우드에 저장되는 것과 동일)입니다. */
+var COMP_ORDER=[['도전정신','도전'],['끈기','끈기'],['문제해결력','문제해결'],['조직융화','조직융화'],['성실·안전','성실·안전']];
+var COMP_DESC={'도전정신':'새로운 일을 피하지 않고 시도하는 태도','끈기':'결과가 늦어도 꾸준히 해내는 힘','문제해결력':'원인을 찾아 스스로 해결하는 힘','조직융화':'동료와 함께 일하고 의견을 조율하는 태도','성실·안전':'규칙·절차와 안전을 지키는 태도'};
+var COMP_NARR={'도전정신':'익숙하지 않은 일도 기대를 갖고 시도하는 편이며, 새로운 기술이나 방식을 받아들이는 데 거부감이 적습니다.','끈기':'결과가 바로 보이지 않아도 꾸준히 이어가는 힘이 있으며, 반복되는 작업도 기준을 지키며 해냅니다.','문제해결력':'문제가 생기면 기다리기보다 원인을 찾아 방법을 바꿔서라도 해결하려는 편입니다.','조직융화':'동료의 이야기를 듣고 의견을 조율하며, 팀 전체가 잘되는 것을 중요하게 여깁니다.','성실·안전':'정해진 규칙과 절차, 안전 수칙을 지키는 것을 중요하게 여기며 맡은 일을 책임감 있게 마무리합니다.'};
+function prLevel(v){return v>=75?'강점':(v>=55?'양호':(v>=40?'보통':'보완 여지'))}
+function prBadgeCls(g){return g==='양호'?'good':(g==='주의'?'warn':(g==='낮음'?'bad':'neutral'))}
+function prBar(name,v,cls,desc){
+  v=Math.max(0,Math.min(100,Math.round(v||0)));
+  return '<div class="pr-bar'+(cls?' '+cls:'')+'"><div class="r1"><span>'+esc(name)+'</span><b>'+v+'</b></div>'+
+    '<div class="tr"><i style="width:'+v+'%"></i></div>'+(desc?'<div class="desc">'+esc(desc)+'</div>':'')+'</div>';
+}
+function prHead(title,x,conf){
+  var meta=x.검사정보||{};
+  return '<div class="pr-head"><div>'+
+    '<div class="pr-brand"><svg width="22" height="22" viewBox="0 0 30 30" aria-hidden="true"><polygon points="15,2 26.3,8.5 26.3,21.5 15,28 3.7,21.5 3.7,8.5" fill="none" stroke="#2E4057" stroke-width="2.4"/><circle cx="15" cy="15" r="4.6" fill="#E8630A"/></svg>고강이엔지 인적성검사</div>'+
+    '<div class="pr-title">'+esc(title)+'</div></div>'+
+    '<div>'+(conf?'<div class="pr-conf">대외비 · 면접 담당자 외 열람 금지</div>':'')+
+    '<div class="pr-sub">응시 '+esc(meta.응시일시||'')+'<br>출력 '+esc(new Date().toLocaleString('ko-KR'))+'</div></div></div>';
+}
+/* 타고난 동기 3욕구 중 무엇이 두드러지는지 한 문장으로 */
+function driveNarrative(p){
+  var arr=[
+    ['지배욕',p.지배욕||0,'목표를 이루고 인정받을 때 가장 힘이 나는 유형입니다. 성과가 분명히 드러나고 책임과 권한이 주어지는 일에서 동기가 살아납니다.'],
+    ['자극욕',p.자극욕||0,'새로운 것을 배우고 익힐 때 가장 힘이 나는 유형입니다. 변화와 배움이 있는 환경에서 동기가 살아납니다.'],
+    ['균형욕',p.균형욕||0,'안정적인 환경과 좋은 관계 속에서 가장 힘이 나는 유형입니다. 예측 가능하고 서로 챙기는 분위기에서 동기가 살아납니다.']];
+  arr.sort(function(a,b){return b[1]-a[1]});
+  if(arr[0][1]-arr[1][1]<=12)return '세 가지 동기가 비교적 고르게 분포되어 있어, 한 가지에 치우치지 않고 다양한 환경에 적응할 수 있는 유형입니다.';
+  return arr[0][2];
+}
+
+/* ---------- 면접관용: 평가에 필요한 모든 것 ---------- */
+function buildInterviewerPrint(x){
+  var info=x.지원자정보||{},meta=x.검사정보||{},rel=x.신뢰도지표||{},sum=x.점수요약_100점||{};
+  var comb=sum.종합_자기보고60_상황판단40||{},selfS=sum.자기보고||{},sjt=sum.상황판단||{},sjtBy=sjt.역량별||{};
+  var alias={'성실·안전':'성실안전'};
+  var h='<div class="pr">'+prHead('면접관용 평가 리포트',x,true);
+
+  h+='<table class="pr-info">'+
+    '<tr><td class="k">이름</td><td>'+esc(info.이름)+'</td><td class="k">지원 직무</td><td>'+esc(info.지원직무)+'</td></tr>'+
+    '<tr><td class="k">경력</td><td>'+esc(info.경력)+'</td><td class="k">총 소요</td><td>'+esc(meta.총소요||'')+'</td></tr>'+
+    '<tr><td class="k">응답 신뢰도</td><td><span class="pr-badge '+prBadgeCls(rel.종합등급)+'">'+esc(rel.종합등급||'-')+'</span></td><td class="k">실무 감각</td><td>'+esc(sum.실무감각||'-')+' 정답</td></tr></table>';
+
+  var flags=rel.감점요인||[];
+  h+='<div class="pr-sec"><h2>1. 응답 신뢰도</h2>'+
+    '<div>'+(flags.length?flags.map(function(f){return '<span class="pr-badge warn">'+esc(f)+'</span>'}).join(''):'<span class="pr-badge good">특이 패턴 없음</span>')+'</div>'+
+    '<div class="pr-note">바람직성 '+(rel.바람직성평균_5점!=null?rel.바람직성평균_5점:'-')+'/5 · 일관성 차이 최대 '+(rel.일관성쌍_최대차이!=null?rel.일관성쌍_최대차이:'-')+' · 중앙 응답시간 '+((rel.리커트_중앙응답시간ms||0)/1000).toFixed(1)+'초 · 초고속 응답 '+(rel.초고속응답수||0)+'건 · 동일 답 최장 연속 '+(rel.동일답최장연속||0)+'회 · 화면 이탈 '+(rel.화면이탈횟수||0)+'회</div>'+
+    '<div class="pr-note">신뢰도가 "주의/낮음"이면 자기보고 점수를 그대로 믿지 말고 상황판단·서술형·면접으로 확인하세요.</div></div>';
+
+  h+='<div class="pr-sec"><h2>2. 핵심 역량 종합 <span class="tag">자기보고 60% + 상황판단 40%</span></h2><div class="pr-two">'+
+    '<div class="pr-radar">'+cloudRadar(comb)+'</div><div class="pr-bars">'+
+    COMP_ORDER.map(function(c){var v=comb[c[0]];return prBar(c[0],v,'',prLevel(v||0))}).join('')+
+    '<div class="pr-note">정서 안정(참고): '+(selfS.정서안정!=null?selfS.정서안정:'-')+'점</div></div></div></div>';
+
+  h+='<div class="pr-sec"><h2>3. 자기보고 vs 상황판단 <span class="tag">상황판단 평균 '+(sjt.평균!=null?sjt.평균:'-')+'점</span></h2>'+
+    '<table class="pr-tbl"><tr><th>역량</th><th class="c">자기보고</th><th class="c">상황판단</th><th class="c">차이</th><th>해석</th></tr>'+
+    COMP_ORDER.map(function(c){
+      var sv=selfS[c[0]]!=null?selfS[c[0]]:selfS[alias[c[0]]];var jv=sjtBy[c[0]];
+      var d=(sv!=null&&jv!=null)?jv-sv:null;
+      var tx=d==null?'-':(Math.abs(d)>=20?(d>0?'실제 판단이 자기평가보다 높음':'자기평가가 실제 판단보다 높음 — 면접 확인'):'일치');
+      return '<tr><td>'+c[0]+'</td><td class="c">'+(sv!=null?sv:'-')+'</td><td class="c">'+(jv!=null?jv:'-')+'</td><td class="c">'+(d==null?'-':(d>0?'+':'')+d)+'</td><td>'+tx+'</td></tr>';
+    }).join('')+'</table>'+
+    '<div class="pr-note">자기보고는 본인이 답한 성향, 상황판단은 현장 상황에서의 실제 선택. 차이가 ±20 이상이면 그 역량은 면접에서 확인.</div></div>';
+
+  var mp=sum.동기프로필||{},limb=mp.타고난동기_림빅양자택일||{},pct=limb.강도100||{},wish=mp.직장에바라는조건_우선순위기반||mp.우선순위기반||{};
+  var rank=(x.동기응답||{}).우선순위_직장에바라는조건||[];
+  h+='<div class="pr-sec"><h2>4. 일 동기 프로필</h2><div class="pr-two"><div>'+
+    '<div class="pr-note" style="margin:0 0 5px"><b>타고난 동기</b> (양자택일 12문항 · 욕구별 8회 대결)</div><div class="pr-bars">'+
+    (pct.지배욕!=null?prBar('성취·인정 (지배욕)',pct.지배욕,'orange')+prBar('새로움·배움 (자극욕)',pct.자극욕,'orange')+prBar('안정·소속 (균형욕)',pct.균형욕,'orange'):'<div class="pr-note">데이터 없음(구버전 검사)</div>')+
+    '</div></div><div>'+
+    '<div class="pr-note" style="margin:0 0 5px"><b>직장에 바라는 조건</b> (우선순위)</div>'+
+    (rank.length?'<div style="font-size:10pt;line-height:1.7">'+rank.map(esc).join('<br>')+'</div>':'<div class="pr-note">무응답</div>')+
+    (wish.지배욕!=null?'<div class="pr-note">지배 '+wish.지배욕+' · 자극 '+wish.자극욕+' · 균형 '+wish.균형욕+'</div>':'')+
+    '</div></div>'+
+    (String(mp.타고난동기와_직장조건의_괴리||'').indexOf('있음')===0?'<div style="margin-top:8px"><span class="pr-badge warn">타고난 동기와 직장에 바라는 조건이 다름 — 면접 확인 포인트</span></div>':'')+
+    (mp.보상선택?'<div class="pr-note">보상 성향: <b>'+esc(mp.보상선택)+'</b></div>':'')+'</div>';
+
+  var mrows=x.실무감각응답||[],wrong=mrows.filter(function(m){return m.정오!=='정답'});
+  h+='<div class="pr-sec'+(wrong.length>6?' allow':'')+'"><h2>5. 실무 감각 <span class="tag">'+esc(sum.실무감각||'')+' 정답</span></h2>'+
+    (wrong.length
+      ?'<table class="pr-tbl"><tr><th>구분</th><th>문항</th><th>지원자 답</th><th>정답</th></tr>'+wrong.map(function(m){return '<tr><td style="white-space:nowrap">'+esc(m.구분||'')+'</td><td>'+esc(m.문항)+'</td><td>'+esc(m.지원자답||'무응답')+'</td><td>'+esc(m.정답)+'</td></tr>'}).join('')+'</table>'
+      :'<div class="pr-note">전 문항 정답</div>')+
+    '<div class="pr-note">공통 기초 6문항 + 직무별 30문항. 경력자는 직무 정답률 80% 미만이면 경력 실체 확인, 신입은 60% 이상이면 준비된 편.</div></div>';
+
+  var srows=x.상황판단응답||[];
+  if(srows.length){
+    h+='<div class="pr-sec allow"><h2>6. 상황 판단 상세</h2><table class="pr-tbl"><tr><th class="c">#</th><th>역량</th><th>상황</th><th class="c">할 것</th><th class="c">안 할 것</th><th class="c">점수</th></tr>'+
+      srows.map(function(r){var s=String(r.상황||'');return '<tr><td class="c">'+r.번호+'</td><td style="white-space:nowrap">'+esc(r.평가역량||'')+'</td><td>'+esc(s.length>64?s.slice(0,64)+'…':s)+'</td><td class="c">'+esc(r.할것같은행동||'-')+'</td><td class="c">'+esc(r.하지않을행동||'-')+'</td><td class="c">'+(r.점수100!=null?r.점수100:'-')+'</td></tr>'}).join('')+'</table></div>';
+  }
+
+  var essays=x.서술형응답||[];
+  if(essays.length){
+    h+='<div class="pr-sec allow"><h2>7. 경험 서술 (원문)</h2>'+essays.map(function(e){
+      var empty=!e.답변||e.답변==='(무응답)';
+      return '<div class="pr-essay"><div class="q">Q'+e.번호+'. ['+esc(e.관련역량||'')+'] '+esc(e.질문)+' <span style="font-weight:400;color:#5B6570">('+(e.글자수||0)+'자)</span></div><div class="a'+(empty?' empty':'')+'">'+esc(empty?'무응답':e.답변)+'</div></div>';
+    }).join('')+'</div>';
+  }
+
+  var an=x.AI분석;
+  if(an&&an.내용){
+    h+='<div class="pr-sec allow pr-break"><h2>8. AI 심층 분석 <span class="tag">'+esc(an.저장일시||'')+' 저장</span></h2><div class="an-body">'+mdToHtml(an.내용)+'</div></div>';
+  }else{
+    h+='<div class="pr-sec"><h2>8. AI 심층 분석</h2><div class="pr-note">저장된 분석이 없습니다. 결과 화면에서 "분석 프롬프트 + 데이터 복사" → Claude 분석 → 결과를 붙여넣어 저장한 뒤 다시 인쇄하면 여기에 포함됩니다.</div></div>';
+  }
+  h+='<div class="pr-foot"><span>본 검사는 참고자료이며 최종 판단은 면접·평판조회 등과 종합해야 합니다.</span><span>고강이엔지 · 면접관용 · 대외비</span></div></div>';
+  return h;
+}
+
+/* ---------- 면접자용: 본인에게 건네도 되는 내용만 ----------
+   신뢰도 판정·자기보고 대비 격차·오답 문항·서술 원문·AI 분석·면접 질문은 넣지 않습니다. */
+function buildCandidatePrint(x){
+  var info=x.지원자정보||{},meta=x.검사정보||{},sum=x.점수요약_100점||{};
+  var comb=sum.종합_자기보고60_상황판단40||{};
+  var mp=sum.동기프로필||{},limb=mp.타고난동기_림빅양자택일||{},pct=limb.강도100||{};
+  var mechTxt=String(sum.실무감각||''),mn=parseInt(mechTxt.split('/')[0],10),mt=parseInt(mechTxt.split('/')[1],10);
+  var ranked=COMP_ORDER.map(function(c){return [c[0],comb[c[0]]||0]}).sort(function(a,b){return b[1]-a[1]});
+  var top=ranked.slice(0,2).map(function(a){return a[0]});
+  var h='<div class="pr pr-cand">'+prHead('나의 결과 리포트',x,false);
+
+  h+='<table class="pr-info">'+
+    '<tr><td class="k">이름</td><td>'+esc(info.이름)+'</td><td class="k">지원 직무</td><td>'+esc(info.지원직무)+'</td></tr>'+
+    '<tr><td class="k">응시일</td><td>'+esc(meta.응시일시||'')+'</td><td class="k">소요 시간</td><td>'+esc(meta.총소요||'')+'</td></tr></table>';
+  h+='<div class="pr-lead">'+esc(info.이름)+'님, 검사에 응해 주셔서 감사합니다. 이 리포트는 검사 결과를 바탕으로 <b>본인의 강점과 일하는 방식</b>을 정리한 것입니다. 정답이 있는 시험이 아니므로 점수의 높낮이보다 <b>어떤 유형인지</b>를 이해하는 데 활용해 주세요.</div>';
+
+  h+='<div class="pr-sec"><h2>1. 나의 역량 프로필</h2><div class="pr-two">'+
+    '<div class="pr-radar">'+cloudRadar(comb)+'</div><div class="pr-bars">'+
+    COMP_ORDER.map(function(c){return prBar(c[0],comb[c[0]],'',COMP_DESC[c[0]]+' · '+prLevel(comb[c[0]]||0))}).join('')+
+    '</div></div>'+
+    '<div class="pr-narr">가장 두드러진 역량은 <b>'+esc(top[0])+'</b>과 <b>'+esc(top[1])+'</b>입니다. '+esc(COMP_NARR[top[0]]||'')+'</div></div>';
+
+  h+='<div class="pr-sec"><h2>2. 나를 움직이는 동기</h2>'+
+    (pct.지배욕!=null
+      ?'<div class="pr-two"><div class="pr-bars">'+prBar('성취·인정',pct.지배욕,'orange','목표를 이루고 인정받는 것')+prBar('새로움·배움',pct.자극욕,'orange','새로운 것을 배우고 익히는 것')+prBar('안정·소속',pct.균형욕,'orange','안정적인 환경과 좋은 관계')+'</div>'+
+       '<div class="pr-narr" style="margin-top:0">'+esc(driveNarrative(pct))+'</div></div>'
+      :'<div class="pr-note">동기 데이터가 없습니다.</div>')+
+    (mp.보상선택?'<div class="pr-note" style="margin-top:8px">보상에 대한 생각: <b>'+(String(mp.보상선택).indexOf('장기')>=0?'당장의 보상보다 배움과 성장을 통해 나중에 더 인정받는 길을 택하는 편입니다.':'배움보다 지금 확실한 보상을 중시하는 편입니다.')+'</b></div>':'')+'</div>';
+
+  if(mt){
+    h+='<div class="pr-sec"><h2>3. 실무 감각</h2><div style="display:flex;align-items:baseline;gap:12px"><span class="pr-big">'+mn+'<span style="font-size:13pt;color:#5B6570;font-weight:600"> / '+mt+'</span></span><span class="pr-note" style="margin:0">문항 정답 ('+Math.round(mn/mt*100)+'%) — 기계·작업 기초 상식과 지원 직무 관련 실무 문항</span></div></div>';
+  }
+
+  h+='<div class="pr-sec"><h2>이 리포트를 보는 방법</h2><div class="pr-note" style="font-size:10pt;line-height:1.75">'+
+    '· 역량 점수는 스스로 답한 성향과 현장 상황에서의 판단을 함께 반영한 값입니다.<br>'+
+    '· 동기 유형에는 좋고 나쁨이 없습니다. 어떤 환경에서 힘이 나는지를 아는 데 도움이 됩니다.<br>'+
+    '· 이 결과는 채용 과정의 참고 자료 중 하나이며, 면접과 함께 종합적으로 검토됩니다.</div></div>';
+  h+='<div class="pr-foot"><span>고강이엔지 인적성검사 · 본인 확인용</span><span>출력 '+esc(new Date().toLocaleDateString('ko-KR'))+'</span></div></div>';
+  return h;
+}
+
+function endPrint(){document.body.classList.remove('printing')}
+function printReport(kind,x){
+  var area=$('printArea');
+  if(!area||!x){toastMsg('인쇄할 결과가 없습니다');return}
+  area.innerHTML=kind==='candidate'?buildCandidatePrint(x):buildInterviewerPrint(x);
+  document.body.classList.add('printing');
+  setTimeout(function(){
+    try{window.print()}catch(e){toastMsg('브라우저 인쇄 메뉴(Ctrl+P)를 이용해 주세요')}
+    setTimeout(endPrint,1500); /* afterprint가 오지 않는 브라우저 대비 */
+  },60);
+}
+window.addEventListener('afterprint',endPrint);
+/* 버튼 대신 Ctrl+P를 눌러도 결과 화면이면 면접관용 문서로 인쇄되게 합니다 */
+window.addEventListener('beforeprint',function(){
+  if(document.body.classList.contains('printing'))return;
+  var x=null;
+  if(S.screen==='report'&&S.result)x=buildExportData();
+  else if(S.cloudX)x=S.cloudX;
+  var area=$('printArea');
+  if(!x||!area)return;
+  area.innerHTML=buildInterviewerPrint(x);
+  document.body.classList.add('printing');
+});
+
 /* ================= 리포트 ================= */
 function radarSVG(vals){
   /* vals: [{name,v}] 5개 */
@@ -2210,7 +2454,8 @@ function renderReport(){
      '<div class="row">'+
        (arc.length?'<select id="selArc" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)"><option value="">저장된 결과 ('+arc.length+'건)</option>'+arcOpts+'</select>':'')+
        (SEND_URL?'<button class="btn small ghost" id="btnCloudList">☁ 전체 지원자(클라우드)</button>':'')+
-       '<button class="btn small" id="btnPrint">인쇄</button>'+
+       '<button class="btn small" id="btnPrintI">면접관용 인쇄</button>'+
+       '<button class="btn small ghost" id="btnPrintC">면접자용 인쇄</button>'+
        '<button class="btn small" id="btnNew">새 검사 시작</button>'+
      '</div>'+
    '</div>'+
@@ -2295,7 +2540,8 @@ function renderReport(){
    '</div></div>'+
   '</div>';
 
-  $('btnPrint').onclick=function(){try{window.print()}catch(e){toastMsg('브라우저 인쇄 메뉴(Ctrl+P)를 이용해 주세요')}};
+  $('btnPrintI').onclick=function(){S.resume=$('fResume2')?$('fResume2').value.trim():S.resume;printReport('interviewer',buildExportData())};
+  $('btnPrintC').onclick=function(){printReport('candidate',buildExportData())};
   $('btnNew').onclick=function(){resetState();go('start')};
   $('btnCopy').onclick=function(){
     S.resume=$('fResume2').value.trim();
